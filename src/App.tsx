@@ -69,8 +69,20 @@ export default function App() {
   const headerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   // Google Apps Script API configuration
-  const [apiUrl, setApiUrl] = useState<string>("");
-  const [apiConnected, setApiConnected] = useState<boolean>(false);
+  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
+  const [apiUrl, setApiUrl] = useState<string>(() => {
+    const val = localStorage.getItem("db_api_url");
+    if (val === null) {
+      localStorage.setItem("db_api_url", DEFAULT_API_URL);
+      return DEFAULT_API_URL;
+    }
+    return val;
+  });
+  const [apiConnected, setApiConnected] = useState<boolean>(() => {
+    const val = localStorage.getItem("db_api_url");
+    if (val === null) return true;
+    return val !== "";
+  });
   const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string>("");
 
@@ -82,7 +94,12 @@ export default function App() {
     const storedTeachers = localStorage.getItem("db_teachers");
     const storedSchedules = localStorage.getItem("db_schedules");
     const storedLogs = localStorage.getItem("db_logs");
-    const storedApiUrl = localStorage.getItem("db_api_url") || "";
+    
+    let storedApiUrl = localStorage.getItem("db_api_url");
+    if (storedApiUrl === null) {
+      storedApiUrl = DEFAULT_API_URL;
+      localStorage.setItem("db_api_url", DEFAULT_API_URL);
+    }
 
     if (storedTeachers) {
       setTeachers(JSON.parse(storedTeachers));
@@ -625,28 +642,30 @@ export default function App() {
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             
             {/* Apps Script Sync Status indicator */}
-            <button
-              id="header-sync-api-btn"
-              onClick={() => setShowConfigModal(true)}
-              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition-all border ${
-                apiConnected 
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
-              }`}
-              title="Integrasi REST API Google Sheets"
-            >
-              {apiConnected ? (
-                <>
-                  <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="hidden sm:inline">Linked</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="hidden sm:inline">Local DB</span>
-                </>
-              )}
-            </button>
+            {isAdmin && (
+              <button
+                id="header-sync-api-btn"
+                onClick={() => setShowConfigModal(true)}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg transition-all border ${
+                  apiConnected 
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+                title="Integrasi REST API Google Sheets"
+              >
+                {apiConnected ? (
+                  <>
+                    <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline">Linked</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="hidden sm:inline">Local DB</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Selected Teacher Pill Info */}
             {currentTeacherObj ? (
@@ -846,7 +865,7 @@ export default function App() {
                 onClick={() => {
                   setApiUrl("");
                   setApiConnected(false);
-                  localStorage.removeItem("db_api_url");
+                  localStorage.setItem("db_api_url", "");
                   setShowConfigModal(false);
                 }}
                 className="px-3 py-1.5 hover:bg-slate-100 text-slate-500 font-semibold rounded-lg transition-colors"
