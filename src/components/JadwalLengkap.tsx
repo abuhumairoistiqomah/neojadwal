@@ -156,11 +156,11 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-3.5 h-3.5 rounded bg-pink-100 border border-pink-200"></span>
-                Kelas Bentrok (Pink, diampu bersamaan tanpa ket. Gabung)
+                Kelas Bentrok (Pink)
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-200"></span>
-                Kelas Gabung (Hijau Muda, terdapat ket. Gabung)
+                Kelas Gabung (Hijau)
               </span>
               <span className="flex items-center gap-1.5 ml-auto">
                 <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
@@ -192,6 +192,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                       </td>
                       {JAM_LIST.map(jam => {
                         const items = scheduleMap[hari][jam] || [];
+
                         if (items.length > 0) {
                           const isSlotGabung = items.some(item => 
                             item.kelasgabung && (
@@ -235,7 +236,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
 
                           return (
                             <td 
-                              key={jam} 
+                              key={`jam-${jam}`} 
                               className={`p-3 border-r border-slate-200 last:border-0 text-center transition-all ${cellClasses}`}
                             >
                               <div className="font-extrabold text-xs sm:text-sm leading-tight">{displayMapel}</div>
@@ -248,7 +249,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           );
                         } else {
                           return (
-                            <td key={jam} className="p-3 border-r border-slate-200 last:border-0 bg-slate-50/20 text-center text-xs text-slate-300 italic">
+                            <td key={`jam-${jam}`} className="p-3 border-r border-slate-200 last:border-0 bg-slate-50/20 text-center text-xs text-slate-300 italic">
                               Kosong
                             </td>
                           );
@@ -263,86 +264,88 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
             {/* MOBILE LAYOUT (LIST CARD PER HARI) */}
             <div className="block md:hidden space-y-4">
               {HARI_LIST.map(hari => {
-                const daySlots = JAM_LIST
-                  .map(jam => ({
-                    jam,
-                    items: scheduleMap[hari][jam] || []
-                  }))
-                  .filter(slot => slot.items.length > 0);
+                const daySlots = JAM_LIST.map(jam => ({
+                  jam,
+                  items: scheduleMap[hari][jam] || []
+                }));
+
+                const hasSchedulesOnDay = daySlots.some(slot => slot.items.length > 0);
 
                 return (
                   <div key={hari} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
                       <span className="font-bold text-slate-800">{hari}</span>
                       <span className="text-xs text-blue-600 bg-blue-50 font-semibold px-2 py-0.5 rounded-full">
-                        {daySlots.length} Sesi
+                        {daySlots.filter(s => s.items.length > 0).length} Sesi
                       </span>
                     </div>
 
                     <div className="p-4 space-y-3 bg-white">
-                      {daySlots.length > 0 ? (
-                        daySlots.map(({ jam, items }) => {
-                          const isSlotGabung = items.some(item => 
-                            item.kelasgabung && (
-                              item.kelasgabung.trim().toLowerCase() === "ya" || 
-                              item.kelasgabung.trim().toLowerCase() === "iya"
-                            )
-                          );
-                          const isConflict = items.length >= 2 && !isSlotGabung;
-
-                          const uniqueMapels = [...new Set(items.map(i => i.mapel))];
-                          const uniqueKelas = [...new Set(items.map(i => i.kelas))];
-                          const displayMapel = uniqueMapels.join(" & ");
-                          const displayKelas = uniqueKelas.join(" & ");
-                          const firstItem = items[0];
-
-                          let bgClasses = "";
-                          let badge = null;
-
-                          if (isSlotGabung) {
-                            bgClasses = "bg-emerald-50 border-emerald-100 text-emerald-900";
-                            badge = (
-                              <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
-                                Gabung (1 JP)
-                              </span>
+                      {daySlots.filter(s => s.items.length > 0).length > 0 ? (
+                        daySlots
+                          .filter(s => s.items.length > 0)
+                          .map(({ jam, items }) => {
+                            const isSlotGabung = items.some(item => 
+                              item.kelasgabung && (
+                                item.kelasgabung.trim().toLowerCase() === "ya" || 
+                                item.kelasgabung.trim().toLowerCase() === "iya"
+                              )
                             );
-                          } else if (isConflict) {
-                            bgClasses = "bg-pink-50 border-pink-100 text-pink-900";
-                            badge = (
-                              <span className="text-[8px] bg-pink-100 text-pink-700 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
-                                Bentrok (1 JP)
-                              </span>
-                            );
-                          } else {
-                            bgClasses = "bg-sky-50 border-sky-100 text-sky-900";
-                            badge = (
-                              <span className="text-[8px] bg-sky-100 text-sky-800 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
-                                Reguler (1 JP)
-                              </span>
-                            );
-                          }
+                            const isConflict = items.length >= 2 && !isSlotGabung;
 
-                          return (
-                            <div 
-                              key={jam}
-                              className={`p-3 rounded-lg border flex items-center justify-between gap-3 ${bgClasses}`}
-                            >
-                              <div>
-                                <span className="text-[10px] font-extrabold uppercase bg-white/60 px-1.5 py-0.5 rounded mr-2">
-                                  Jam {jam}
+                            const uniqueMapels = [...new Set(items.map(i => i.mapel))];
+                            const uniqueKelas = [...new Set(items.map(i => i.kelas))];
+                            const displayMapel = uniqueMapels.join(" & ");
+                            const displayKelas = uniqueKelas.join(" & ");
+                            const firstItem = items[0];
+
+                            let bgClasses = "";
+                            let badge = null;
+
+                            if (isSlotGabung) {
+                              bgClasses = "bg-emerald-50 border-emerald-100 text-emerald-900";
+                              badge = (
+                                <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
+                                  Gabung (1 JP)
                                 </span>
-                                <span className="text-xs font-medium opacity-80">
-                                  {firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : JAM_TIME_MAP[jam]}
+                              );
+                            } else if (isConflict) {
+                              bgClasses = "bg-pink-50 border-pink-100 text-pink-900";
+                              badge = (
+                                <span className="text-[8px] bg-pink-100 text-pink-700 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
+                                  Bentrok (1 JP)
                                 </span>
-                                <h4 className="font-bold text-sm mt-1">{displayMapel}</h4>
-                                <div className="mt-1">{badge}</div>
+                              );
+                            } else {
+                              bgClasses = "bg-sky-50 border-sky-100 text-sky-900";
+                              badge = (
+                                <span className="text-[8px] bg-sky-100 text-sky-800 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
+                                  Reguler (1 JP)
+                                </span>
+                              );
+                            }
+
+                            return (
+                              <div 
+                                key={jam}
+                                className={`p-3 rounded-lg border flex items-center justify-between gap-3 ${bgClasses}`}
+                              >
+                                <div>
+                                  <span className="text-[10px] font-extrabold uppercase bg-white/60 px-1.5 py-0.5 rounded mr-2">
+                                    Jam {jam}
+                                  </span>
+                                  <span className="text-xs font-medium opacity-80">
+                                    {firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : JAM_TIME_MAP[jam]}
+                                  </span>
+                                  <h4 className="font-bold text-sm mt-1">{displayMapel}</h4>
+                                  <div className="mt-1">{badge}</div>
+                                </div>
+                                <div className="text-right text-xs">
+                                  <span className="block font-bold">Kelas {displayKelas}</span>
+                                </div>
                               </div>
-                              <div className="text-right text-xs">
-                                <span className="block font-bold">Kelas {displayKelas}</span>
-                              </div>
-                            </div>
-                          );
-                        })
+                            );
+                          })
                       ) : (
                         <div className="text-center py-4 text-xs text-slate-400 italic">
                           Tidak ada jadwal mengajar pada hari ini

@@ -7,6 +7,7 @@ import {
 } from "./mockData";
 import { Dashboard } from "./components/Dashboard";
 import { JadwalLengkap } from "./components/JadwalLengkap";
+import { JadwalKelas } from "./components/JadwalKelas";
 import { ListMapel } from "./components/ListMapel";
 import { JamKosongIndividu } from "./components/JamKosongIndividu";
 import { JamKosongSemua } from "./components/JamKosongSemua";
@@ -258,6 +259,7 @@ export default function App() {
         // Derive properties from spreadsheet columns to keep backward compatibility
         const mappedTeachers = masterGuru.map((t: any) => ({
           ...t,
+          panggilan: t.panggilan !== undefined ? t.panggilan : (t.Panggilan !== undefined ? t.Panggilan : null),
           wali_kelas: t.wali_kelas !== undefined ? t.wali_kelas : (t.tugas_tambahan?.toLowerCase().includes("wali") ? t.keterangan : null),
           pendamping_kelas: t.pendamping_kelas !== undefined ? t.pendamping_kelas : (t.tugas_tambahan?.toLowerCase().includes("pendamping") ? t.keterangan : null),
           is_manajemen: t.is_manajemen !== undefined ? t.is_manajemen : (t.tugas_tambahan?.toLowerCase().includes("manajemen") || false)
@@ -375,6 +377,7 @@ export default function App() {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, adminOnly: false },
     { id: "jadwal-lengkap", label: "Jadwal Lengkap", icon: Calendar, adminOnly: false },
+    { id: "jadwal-kelas", label: "Jadwal Kelas", icon: Layers, adminOnly: false },
     { id: "list-mapel", label: "List Mapel Diajar", icon: BookOpen, adminOnly: false },
     { id: "jam-kosong-individu", label: "Jam Kosong Indiv", icon: Clock, adminOnly: false },
     { id: "jam-kosong-semua", label: "Jam Kosong Semua", icon: Users, adminOnly: true },
@@ -719,6 +722,14 @@ export default function App() {
               />
             )}
 
+            {activePage === "jadwal-kelas" && (
+              <JadwalKelas 
+                teachers={teachers}
+                schedules={schedules}
+                onBack={() => setActivePage("dashboard")}
+              />
+            )}
+
             {activePage === "list-mapel" && (
               <ListMapel 
                 teachers={teachers}
@@ -794,14 +805,18 @@ export default function App() {
           <div className="max-w-6xl mx-auto mt-12 pt-6 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
             <p className="font-semibold text-slate-500">SISKA © 2026 • Sistem Informasi Akademik & Inval Sekolah</p>
             <div className="flex items-center gap-3">
-              <button 
-                id="footer-btn-reset" 
-                onClick={handleResetLocalDB} 
-                className="hover:text-blue-600 transition-colors font-bold"
-              >
-                Setel Ulang DB
-              </button>
-              <span>•</span>
+              {isAdmin && (
+                <>
+                  <button 
+                    id="footer-btn-reset" 
+                    onClick={handleResetLocalDB} 
+                    className="hover:text-red-600 text-red-500 transition-colors font-bold"
+                  >
+                    Setel Ulang DB
+                  </button>
+                  <span>•</span>
+                </>
+              )}
               <button 
                 id="footer-btn-admin-route"
                 onClick={() => {

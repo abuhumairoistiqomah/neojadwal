@@ -1,5 +1,6 @@
 export interface Teacher {
   nama: string;
+  panggilan?: string | null;
   mapel_utama: string;
   rumpun: string;
   jenjang: string;
@@ -49,6 +50,7 @@ export interface AdminAccount {
 export type ActivePage = 
   | "dashboard"
   | "jadwal-lengkap"
+  | "jadwal-kelas"
   | "list-mapel"
   | "jam-kosong-individu"
   | "jam-kosong-semua"
