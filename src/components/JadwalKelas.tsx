@@ -126,6 +126,35 @@ const getColumns = (type: "Ikhwan" | "Akhwat" | "Normal", isG12: boolean): Colum
   }
 };
 
+// Helper to get Friday-specific columns
+export const getFridayColumns = (type: "Ikhwan" | "Akhwat" | "Normal", isG12: boolean): ColumnDef[] => {
+  const isAkhwat = type === "Akhwat";
+  if (isAkhwat) {
+    return [
+      { type: "jp", jpNumber: 1, label: "JAM KE-1", timeRange: "07:15 - 08:15" },
+      { type: "break", label: "ISTIRAHAT", timeRange: "08:15 - 08:30" },
+      { type: "jp", jpNumber: 2, label: "JAM KE-2", timeRange: "08:30 - 09:30" },
+      { type: "jp", jpNumber: 3, label: "JAM KE-3", timeRange: isG12 ? "09:30 - 10:20" : "09:30 - 10:30" },
+      { type: "break", label: "Al-Kahfi", timeRange: "10:30 - 11:00" },
+      { type: "ishoma", label: "Ishoma", timeRange: "11:00 - 13:00" },
+      { type: "jp", jpNumber: 4, label: "JP 4", timeRange: "13:00 - 14:00" },
+      { type: "jp", jpNumber: 5, label: "JP 5", timeRange: "14:00 - 15:00" },
+    ];
+  } else {
+    // Ikhwan & Normal
+    return [
+      { type: "jp", jpNumber: 1, label: "JAM KE-1", timeRange: "07:15 - 08:15" },
+      { type: "jp", jpNumber: 2, label: "JAM KE-2", timeRange: "08:15 - 09:15" },
+      { type: "break", label: "ISTIRAHAT", timeRange: "09:15 - 09:30" },
+      { type: "jp", jpNumber: 3, label: "JAM KE-3", timeRange: isG12 ? "09:30 - 10:20" : "09:30 - 10:30" },
+      { type: "break", label: "Al-Kahfi", timeRange: "10:30 - 11:00" },
+      { type: "ishoma", label: "Ishoma", timeRange: "11:00 - 13:00" },
+      { type: "jp", jpNumber: 4, label: "JP 4", timeRange: "13:00 - 14:00" },
+      { type: "jp", jpNumber: 5, label: "JP 5", timeRange: "14:00 - 15:00" },
+    ];
+  }
+};
+
 const getBreakColors = (type: "Ikhwan" | "Akhwat" | "Normal") => {
   if (type === "Akhwat") {
     return {
@@ -191,6 +220,10 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
     return getColumns(classType, isG12Class);
   }, [classType, isG12Class]);
 
+  const fridayColumns = useMemo(() => {
+    return getFridayColumns(classType, isG12Class);
+  }, [classType, isG12Class]);
+
   // Map schedules to 2D lookup [Hari][Jam_ke] -> ScheduleItem[]
   const scheduleMap = useMemo(() => {
     const map: Record<string, Record<number, ScheduleItem[]>> = {};
@@ -231,6 +264,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
     if (!element) return;
 
     setIsDownloading(true);
+    const stylesToRestore: { el: HTMLStyleElement; originalText: string }[] = [];
     try {
       const convertOklchToHsla = (cssText: string): string => {
         // Regex matches standard numeric OKLCH patterns and translates to HSLA
@@ -260,6 +294,14 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
         // Replace any remaining oklch(...) occurrences with a fallback color to guarantee NO crashes
         return converted.replace(/oklch\([^)]+\)/g, "rgba(226, 232, 240, 1)");
       };
+
+      // Temporarily sanitize style elements in the parent document to avoid html2canvas processing crashes
+      document.querySelectorAll("style").forEach(styleEl => {
+        if (styleEl.textContent && styleEl.textContent.includes("oklch")) {
+          stylesToRestore.push({ el: styleEl, originalText: styleEl.textContent });
+          styleEl.textContent = convertOklchToHsla(styleEl.textContent);
+        }
+      });
 
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(element, {
@@ -296,6 +338,10 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
       console.error("Gagal mendownload gambar:", error);
       alert("Gagal mengunduh gambar jadwal karena ada kendala rendering format warna. Silakan coba lagi.");
     } finally {
+      // Restore styles in the parent document immediately
+      stylesToRestore.forEach(({ el, originalText }) => {
+        el.textContent = originalText;
+      });
       setIsDownloading(false);
     }
   };
@@ -523,7 +569,8 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {HARI_LIST.map(hari => (
+                    {/* 1. Monday to Thursday Rows */}
+                    {["Senin", "Selasa", "Rabu", "Kamis"].map(hari => (
                       <tr key={hari} className="hover:bg-slate-50/50 transition-colors">
                         <td className="p-4 font-black text-slate-700 bg-slate-100/50 text-center border-r border-slate-200">
                           {hari}
@@ -534,10 +581,6 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                           if (col.type === "jp" && col.jpNumber !== undefined) {
                             const jam = col.jpNumber;
                             const items = scheduleMap[hari][jam] || [];
-                            const isFriday = hari === "Jumat";
-                            const cellTimeRange = isFriday 
-                              ? getFridayTimeRange(jam, selectedClass, classType) 
-                              : col.timeRange;
 
                             if (items.length > 0) {
                               const displayMapel = items.map(i => i.mapel).join(" & ");
@@ -560,7 +603,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                                     {displayGuru || "Tanpa Guru"}
                                   </div>
                                   <div className="text-[9px] mt-0.5 text-slate-400 font-bold">
-                                    {cellTimeRange}
+                                    {col.timeRange}
                                   </div>
                                 </td>
                               );
@@ -568,24 +611,20 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                               return (
                                 <td key={`cell-${idx}`} className="p-3 border-r border-slate-200 bg-slate-50/20 text-center text-xs text-slate-300 italic align-middle">
                                   <div className="font-medium">Kosong</div>
-                                  <div className="text-[9px] mt-0.5 text-slate-400">{cellTimeRange}</div>
+                                  <div className="text-[9px] mt-0.5 text-slate-400">{col.timeRange}</div>
                                 </td>
                               );
                             }
                           } else if (col.type === "break" || col.type === "ishoma") {
                             const colors = getBreakColors(classType);
-                            const isFriday = hari === "Jumat";
-                            const breakInfo = isFriday 
-                              ? getFridayBreakInfo(col.type, selectedClass, classType) 
-                              : { label: col.label, timeRange: col.timeRange };
 
                             return (
                               <td 
                                 key={`cell-${idx}`} 
                                 className={`p-3 border-r border-slate-200 text-center transition-all align-middle ${colors.bg}`}
                               >
-                                <div className="text-[10px] font-extrabold tracking-tight uppercase">{breakInfo.label}</div>
-                                <div className="text-[9px] font-bold opacity-80 mt-0.5">{breakInfo.timeRange}</div>
+                                <div className="text-[10px] font-extrabold tracking-tight uppercase">{col.label}</div>
+                                <div className="text-[9px] font-bold opacity-80 mt-0.5">{col.timeRange}</div>
                               </td>
                             );
                           }
@@ -593,6 +632,113 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                         })}
                       </tr>
                     ))}
+
+                    {/* 2. Special Separator for Friday */}
+                    <tr className="bg-slate-200 border-y border-slate-300">
+                      <td colSpan={9} className="p-3 font-black text-xs uppercase tracking-wider text-slate-800 text-center bg-slate-200 select-none">
+                        KHUSUS HARI JUM'AT
+                      </td>
+                    </tr>
+
+                    {/* 3. Friday Column Headers Row */}
+                    <tr className="bg-slate-100 border-b border-slate-200">
+                      <th className="p-3 text-xs font-extrabold text-slate-400 uppercase tracking-wider text-center w-28 border-r border-slate-200">
+                        HARI/JAM
+                      </th>
+                      {fridayColumns.map((col, idx) => (
+                        <th 
+                          key={`fri-col-head-${idx}`} 
+                          className={`p-3 text-xs font-extrabold uppercase tracking-wider text-center border-r border-slate-200 last:border-0 ${
+                            col.type === "break" || col.type === "ishoma"
+                              ? classType === "Akhwat"
+                                ? "bg-purple-100/40 text-purple-900 border-r-purple-200"
+                                : "bg-slate-100 text-slate-900 border-r-slate-200"
+                              : "text-slate-600"
+                          }`}
+                        >
+                          <div>{col.label}</div>
+                          <div className="text-[10px] font-semibold mt-1 opacity-75">{col.timeRange}</div>
+                        </th>
+                      ))}
+                    </tr>
+
+                    {/* 4. Friday Row */}
+                    <tr className="hover:bg-slate-50/50 transition-colors bg-blue-50/5">
+                      <td className="p-4 font-black text-slate-700 bg-slate-100/50 text-center border-r border-slate-200">
+                        Jumat
+                      </td>
+                      {fridayColumns.map((col, idx) => {
+                        if (col.type === "jp" && col.jpNumber !== undefined) {
+                          const jam = col.jpNumber;
+                          
+                          // Rule check: Hari jum'at untuk kelas 1-11, setelah JP 3 tulis kosong
+                          const isAfterJP3 = jam >= 4;
+                          const isClass1to11 = !isGrade12Class;
+                          
+                          const showAsKosong = isAfterJP3 && isClass1to11;
+                          const items = showAsKosong ? [] : (scheduleMap["Jumat"][jam] || []);
+
+                          if (items.length > 0) {
+                            const displayMapel = items.map(i => i.mapel).join(" & ");
+                            const uniqueTeachers = [
+                              ...new Set(
+                                items.flatMap(item => [
+                                  item.guru1, item.guru2, item.guru3, item.guru4, item.guru5, item.guru6
+                                ])
+                              )
+                            ].filter(Boolean) as string[];
+                            const displayGuru = uniqueTeachers.map(name => getTeacherDisplayName(name)).join(", ");
+
+                            return (
+                              <td 
+                                key={`cell-fri-${idx}`} 
+                                className="p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle"
+                              >
+                                <div className="font-extrabold text-xs sm:text-sm leading-tight text-slate-800">{displayMapel}</div>
+                                <div className="text-[10px] font-bold mt-1 text-blue-800 line-clamp-2" title={displayGuru}>
+                                  {displayGuru || "Tanpa Guru"}
+                                </div>
+                                <div className="text-[9px] mt-0.5 text-slate-400 font-bold">
+                                  {col.timeRange}
+                                </div>
+                              </td>
+                            );
+                          } else {
+                            // Empty Friday cell
+                            const displayLabel = (isG12Class && jam >= 3) ? "Pulang" : "Kosong";
+                            return (
+                              <td key={`cell-fri-${idx}`} className="p-3 border-r border-slate-200 bg-slate-50/20 text-center text-xs text-slate-300 italic align-middle">
+                                <div className="font-medium">{displayLabel}</div>
+                                <div className="text-[9px] mt-0.5 text-slate-400">{col.timeRange}</div>
+                              </td>
+                            );
+                          }
+                        } else if (col.type === "break" || col.type === "ishoma") {
+                          const colors = getBreakColors(classType);
+                          const isAlKahfiOrIshoma = col.label === "Al-Kahfi" || col.label === "Ishoma";
+                          
+                          if (isAlKahfiOrIshoma && isG12Class) {
+                            return (
+                              <td key={`cell-fri-${idx}`} className="p-3 border-r border-slate-200 bg-slate-50/20 text-center text-xs text-slate-300 italic align-middle">
+                                <div className="font-medium">Pulang</div>
+                                <div className="text-[9px] mt-0.5 text-slate-400">{col.timeRange}</div>
+                              </td>
+                            );
+                          }
+
+                          return (
+                            <td 
+                              key={`cell-fri-${idx}`} 
+                              className={`p-3 border-r border-slate-200 text-center transition-all align-middle ${colors.bg}`}
+                            >
+                              <div className="text-[10px] font-extrabold tracking-tight uppercase">{col.label}</div>
+                              <div className="text-[9px] font-bold opacity-80 mt-0.5">{col.timeRange}</div>
+                            </td>
+                          );
+                        }
+                        return null;
+                      })}
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -610,80 +756,96 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                       </div>
 
                       <div className="p-4 space-y-3 bg-white">
-                        {columns.map((col, idx) => {
-                          if (col.type === "jp" && col.jpNumber !== undefined) {
-                            const jam = col.jpNumber;
-                            const items = scheduleMap[hari][jam] || [];
-                            const isFriday = hari === "Jumat";
-                            const cellTimeRange = isFriday 
-                              ? getFridayTimeRange(jam, selectedClass, classType) 
-                              : col.timeRange;
+                        {(() => {
+                          const isFriday = hari === "Jumat";
+                          const currentCols = isFriday ? fridayColumns : columns;
+                          return currentCols.map((col, idx) => {
+                            if (col.type === "jp" && col.jpNumber !== undefined) {
+                              const jam = col.jpNumber;
+                              
+                              // Check Friday rules
+                              const isAfterJP3 = jam >= 4;
+                              const isClass1to11 = !isGrade12Class;
+                              const showAsKosong = isFriday && isAfterJP3 && isClass1to11;
 
-                            if (items.length > 0) {
-                              const displayMapel = items.map(i => i.mapel).join(" & ");
-                              const uniqueTeachers = [
-                                ...new Set(
-                                  items.flatMap(item => [
-                                    item.guru1, item.guru2, item.guru3, item.guru4, item.guru5, item.guru6
-                                  ])
-                                )
-                              ].filter(Boolean) as string[];
-                              const displayGuru = uniqueTeachers.map(name => getTeacherDisplayName(name)).join(", ");
+                              const items = showAsKosong ? [] : (scheduleMap[hari][jam] || []);
 
-                              return (
-                                <div 
-                                  key={`mob-cell-${idx}`}
-                                  className="p-3 rounded-lg border border-blue-100 bg-blue-50/50 text-blue-900 flex items-center justify-between gap-3"
-                                >
-                                  <div>
-                                    <span className="text-[9px] font-extrabold uppercase bg-white px-1.5 py-0.5 rounded mr-2 border border-blue-100 shadow-3xs text-blue-700">
-                                      Jam {jam}
-                                    </span>
-                                    <span className="text-xs font-semibold text-slate-500">
-                                      {cellTimeRange}
-                                    </span>
-                                    <h4 className="font-bold text-slate-800 text-sm mt-1">{displayMapel}</h4>
-                                    <p className="text-xs opacity-95 text-slate-600 mt-1 font-medium">
-                                      Guru: <span className="font-bold text-blue-800">{displayGuru || "Tanpa Guru"}</span>
-                                    </p>
+                              if (items.length > 0) {
+                                const displayMapel = items.map(i => i.mapel).join(" & ");
+                                const uniqueTeachers = [
+                                  ...new Set(
+                                    items.flatMap(item => [
+                                      item.guru1, item.guru2, item.guru3, item.guru4, item.guru5, item.guru6
+                                    ])
+                                  )
+                                ].filter(Boolean) as string[];
+                                const displayGuru = uniqueTeachers.map(name => getTeacherDisplayName(name)).join(", ");
+
+                                return (
+                                  <div 
+                                    key={`mob-cell-${idx}`}
+                                    className="p-3 rounded-lg border border-blue-100 bg-blue-50/50 text-blue-900 flex items-center justify-between gap-3"
+                                  >
+                                    <div>
+                                      <span className="text-[9px] font-extrabold uppercase bg-white px-1.5 py-0.5 rounded mr-2 border border-blue-100 shadow-3xs text-blue-700">
+                                        Jam {jam}
+                                      </span>
+                                      <span className="text-xs font-semibold text-slate-500">
+                                        {col.timeRange}
+                                      </span>
+                                      <h4 className="font-bold text-slate-800 text-sm mt-1">{displayMapel}</h4>
+                                      <p className="text-xs opacity-95 text-slate-600 mt-1 font-medium">
+                                        Guru: <span className="font-bold text-blue-800">{displayGuru || "Tanpa Guru"}</span>
+                                      </p>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            } else {
+                                );
+                              } else {
+                                const displayLabel = (isFriday && isG12Class && jam >= 3) ? "Pulang" : "Kosong";
+                                return (
+                                  <div 
+                                    key={`mob-cell-${idx}`}
+                                    className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-400 text-xs italic flex justify-between"
+                                  >
+                                    <span className="font-medium text-slate-400">Jam {jam} ({col.timeRange})</span>
+                                    <span className="font-semibold">{displayLabel}</span>
+                                  </div>
+                                );
+                              }
+                            } else if (col.type === "break" || col.type === "ishoma") {
+                              const colors = getBreakColors(classType);
+                              const isAlKahfiOrIshoma = col.label === "Al-Kahfi" || col.label === "Ishoma";
+                              
+                              if (isFriday && isAlKahfiOrIshoma && isG12Class) {
+                                return (
+                                  <div 
+                                    key={`mob-cell-${idx}`}
+                                    className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-400 text-xs italic flex justify-between"
+                                  >
+                                    <span className="font-medium text-slate-400">{col.label} ({col.timeRange})</span>
+                                    <span className="font-semibold text-slate-500">Pulang</span>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div 
                                   key={`mob-cell-${idx}`}
-                                  className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-400 text-xs italic flex justify-between"
+                                  className={`p-3 rounded-lg border flex items-center justify-between ${colors.bgMobile}`}
                                 >
-                                  <span className="font-medium text-slate-400">Jam {jam} ({cellTimeRange})</span>
-                                  <span className="font-semibold">Kosong</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`animate-pulse w-2 h-2 rounded-full ${colors.pulse}`}></span>
+                                    <span className="text-xs font-black uppercase tracking-wide">{col.label}</span>
+                                  </div>
+                                  <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${colors.badge}`}>
+                                    {col.timeRange}
+                                  </span>
                                 </div>
                               );
                             }
-                          } else if (col.type === "break" || col.type === "ishoma") {
-                            const colors = getBreakColors(classType);
-                            const isFriday = hari === "Jumat";
-                            const breakInfo = isFriday 
-                              ? getFridayBreakInfo(col.type, selectedClass, classType) 
-                              : { label: col.label, timeRange: col.timeRange };
-
-                            return (
-                              <div 
-                                key={`mob-cell-${idx}`}
-                                className={`p-3 rounded-lg border flex items-center justify-between ${colors.bgMobile}`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className={`animate-pulse w-2 h-2 rounded-full ${colors.pulse}`}></span>
-                                  <span className="text-xs font-black uppercase tracking-wide">{breakInfo.label}</span>
-                                </div>
-                                <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${colors.badge}`}>
-                                  {breakInfo.timeRange}
-                                </span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })}
+                            return null;
+                          });
+                        })()}
                       </div>
                     </div>
                   );

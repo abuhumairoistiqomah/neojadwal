@@ -70,10 +70,11 @@ export default function App() {
   const headerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   // Google Apps Script API configuration
-  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
+  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec";
   const [apiUrl, setApiUrl] = useState<string>(() => {
     const val = localStorage.getItem("db_api_url");
-    if (val === null) {
+    const oldDefault = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
+    if (val === null || val === oldDefault) {
       localStorage.setItem("db_api_url", DEFAULT_API_URL);
       return DEFAULT_API_URL;
     }
@@ -81,7 +82,8 @@ export default function App() {
   });
   const [apiConnected, setApiConnected] = useState<boolean>(() => {
     const val = localStorage.getItem("db_api_url");
-    if (val === null) return true;
+    const oldDefault = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
+    if (val === null || val === oldDefault) return true;
     return val !== "";
   });
   const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
@@ -97,7 +99,8 @@ export default function App() {
     const storedLogs = localStorage.getItem("db_logs");
     
     let storedApiUrl = localStorage.getItem("db_api_url");
-    if (storedApiUrl === null) {
+    const oldDefault = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
+    if (storedApiUrl === null || storedApiUrl === oldDefault) {
       storedApiUrl = DEFAULT_API_URL;
       localStorage.setItem("db_api_url", DEFAULT_API_URL);
     }
