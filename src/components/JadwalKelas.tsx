@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Teacher, ScheduleItem, normalizeDay } from "../types";
-import { ArrowLeft, AlertCircle, Search, Users, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertCircle, Search, Users, Download, Loader2, Printer } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
 interface JadwalKelasProps {
@@ -29,7 +29,7 @@ export const getClassType = (className: string): "Ikhwan" | "Akhwat" | "Normal" 
 export const isGrade1Or2 = (className: string): boolean => {
   if (!className) return false;
   const name = className.trim().toLowerCase();
-  return /^(1|2)\b|^(1|2)[a-z]|class\s*(1|2)|grade\s*(1|2)|primary\s*(1|2)/i.test(name);
+  return /^(0?1|0?2)\b|^(0?1|0?2)[a-z]/i.test(name) || /class\s*(0?1|0?2)\b/i.test(name) || /grade\s*(0?1|0?2)\b/i.test(name) || /primary\s*(0?1|0?2)\b/i.test(name);
 };
 
 // Helper to check if Grade 12
@@ -249,24 +249,116 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
   // Map full name to nickname ("Panggilan")
   const getTeacherDisplayName = (fullName: string): string => {
     if (!fullName) return "";
-    const matchedTeacher = teachers.find(
-      t => t.nama.trim().toLowerCase() === fullName.trim().toLowerCase()
-    );
+    
+    // Normalize teacher name by stripping common titles & degrees and special characters to allow resilient matching
+    const normalizeTeacherName = (name: string): string => {
+      return name
+        .toLowerCase()
+        .replace(/(,?\s*(s\.pd|m\.pd|s\.h|lc|m\.s\.i|s\.si|s\.m\.gr|m\.pd\.i|s\.pd\.i|s\.kom|s\.e|s\.tp|s\.ag|b\.a)\.?)+$/gi, "")
+        .replace(/[^a-z0-9]/g, "")
+        .trim();
+    };
+
+    const cleanFull = normalizeTeacherName(fullName);
+    const matchedTeacher = teachers.find(t => {
+      const cleanTeacherName = normalizeTeacherName(t.nama);
+      return cleanTeacherName === cleanFull || t.nama.trim().toLowerCase() === fullName.trim().toLowerCase();
+    });
+
     if (matchedTeacher && matchedTeacher.panggilan) {
       return matchedTeacher.panggilan.trim();
     }
     return fullName.trim();
   };
 
-  // Capture table to PNG Image using html2canvas
+  // Trigger standard browser printing for beautiful high-quality vector PDF (A4 Landscape)
+  const handlePrintPDF = () => {
+    const element = document.getElementById("timetable-capture-area");
+    if (!element) return;
+
+    // Create a temporary container directly attached to body
+    const printContainer = document.createElement("div");
+    printContainer.id = "temp-print-container";
+    
+    // Clone our capture area to avoid styling layout pollution on the main view
+    const clone = element.cloneNode(true) as HTMLElement;
+    printContainer.appendChild(clone);
+    document.body.appendChild(printContainer);
+
+    // Create print-specific style rules to guarantee pixel-perfect layout and color accuracy
+    const style = document.createElement("style");
+    style.id = "temp-print-style";
+    style.textContent = `
+      @media screen {
+        #temp-print-container {
+          display: none !important;
+        }
+      }
+      @media print {
+        /* Hide everything except our print container */
+        body > *:not(#temp-print-container) {
+          display: none !important;
+        }
+        body, html {
+          background: white !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+        }
+        #temp-print-container {
+          display: block !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: white !important;
+        }
+        #temp-print-container > div {
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          width: 100% !important;
+        }
+        @page {
+          size: A4 landscape;
+          margin: 0.8cm 1cm;
+        }
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Trigger standard print dialog
+    window.print();
+
+    // Clean up temporary elements immediately after dialog closes
+    setTimeout(() => {
+      printContainer.remove();
+      style.remove();
+    }, 1000);
+  };
+
+  // Capture table to JPG Image using html2canvas
   const handleDownloadImage = async () => {
     const element = document.getElementById("timetable-capture-area");
     if (!element) return;
 
     setIsDownloading(true);
     const stylesToRestore: { el: HTMLStyleElement; originalText: string }[] = [];
+    const adoptedToRestore = [...document.adoptedStyleSheets];
+
     try {
-      const convertOklchToHsla = (cssText: string): string => {
+      // Clear constructed/adopted stylesheets temporarily during html2canvas capture to avoid parsing errors
+      try {
+        document.adoptedStyleSheets = [];
+      } catch (e) {}
+
+      const sanitizeUnsupportedColors = (cssText: string): string => {
         // Regex matches standard numeric OKLCH patterns and translates to HSLA
         let converted = cssText.replace(
           /oklch\(\s*([0-9.%]+)[\s,]+([0-9.%]+)[\s,]+([0-9.%]+)(?:\s*[\s,/]+\s*([0-9.%]+))?\s*\)/g,
@@ -292,14 +384,37 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
           }
         );
         // Replace any remaining oklch(...) occurrences with a fallback color to guarantee NO crashes
-        return converted.replace(/oklch\([^)]+\)/g, "rgba(226, 232, 240, 1)");
+        converted = converted.replace(/oklch\([^)]+\)/g, "rgba(226, 232, 240, 1)");
+        // Replace any oklab(...) occurrences with a fallback color to guarantee NO crashes
+        converted = converted.replace(/oklab\([^)]+\)/g, "rgba(226, 232, 240, 1)");
+        return converted;
       };
 
       // Temporarily sanitize style elements in the parent document to avoid html2canvas processing crashes
       document.querySelectorAll("style").forEach(styleEl => {
-        if (styleEl.textContent && styleEl.textContent.includes("oklch")) {
-          stylesToRestore.push({ el: styleEl, originalText: styleEl.textContent });
-          styleEl.textContent = convertOklchToHsla(styleEl.textContent);
+        try {
+          let text = styleEl.textContent || "";
+          
+          // Reconstruct rules from CSSOM if the stylesheet content is dynamically injected (Vite mode)
+          if (!text && styleEl.sheet) {
+            try {
+              const rules: string[] = [];
+              const cssRules = styleEl.sheet.cssRules;
+              for (let i = 0; i < cssRules.length; i++) {
+                rules.push(cssRules[i].cssText);
+              }
+              text = rules.join("\n");
+            } catch (e) {
+              // Ignore cross-origin access exceptions
+            }
+          }
+
+          if (text && (text.includes("oklch") || text.includes("oklab"))) {
+            stylesToRestore.push({ el: styleEl, originalText: styleEl.textContent || "" });
+            styleEl.textContent = sanitizeUnsupportedColors(text);
+          }
+        } catch (err) {
+          console.warn("Could not sanitize stylesheet:", err);
         }
       });
 
@@ -314,7 +429,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
           const styleTags = clonedDoc.querySelectorAll("style");
           styleTags.forEach(style => {
             if (style.textContent) {
-              style.textContent = convertOklchToHsla(style.textContent);
+              style.textContent = sanitizeUnsupportedColors(style.textContent);
             }
           });
 
@@ -323,16 +438,16 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
           elementsWithStyle.forEach(el => {
             const inlineStyle = el.getAttribute("style");
             if (inlineStyle) {
-              el.setAttribute("style", convertOklchToHsla(inlineStyle));
+              el.setAttribute("style", sanitizeUnsupportedColors(inlineStyle));
             }
           });
         }
       });
       
-      const image = canvas.toDataURL("image/png");
+      const image = canvas.toDataURL("image/jpeg", 0.95);
       const link = document.createElement("a");
       link.href = image;
-      link.download = `Jadwal_Kelas_${selectedClass.replace(/\s+/g, "_")}.png`;
+      link.download = `Jadwal_Kelas_${selectedClass.replace(/\s+/g, "_")}.jpg`;
       link.click();
     } catch (error) {
       console.error("Gagal mendownload gambar:", error);
@@ -342,6 +457,9 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
       stylesToRestore.forEach(({ el, originalText }) => {
         el.textContent = originalText;
       });
+      try {
+        document.adoptedStyleSheets = adoptedToRestore;
+      } catch (e) {}
       setIsDownloading(false);
     }
   };
@@ -458,9 +576,18 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
         {selectedClass ? (
           <div className="space-y-6">
             {/* Download Button Row */}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3 flex-wrap">
               <button
-                id="download-timetable-png-btn"
+                id="print-timetable-pdf-btn"
+                onClick={handlePrintPDF}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Cetak / Simpan PDF (A4)
+              </button>
+
+              <button
+                id="download-timetable-jpg-btn"
                 onClick={handleDownloadImage}
                 disabled={isDownloading}
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all cursor-pointer"
@@ -473,7 +600,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                 ) : (
                   <>
                     <Download className="w-3.5 h-3.5" />
-                    Unduh Jadwal Kelas (PNG)
+                    Unduh Jadwal Kelas (JPG)
                   </>
                 )}
               </button>
@@ -668,15 +795,34 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                         Jumat
                       </td>
                       {fridayColumns.map((col, idx) => {
+                        let showAsPulang = false;
+                        
+                        // Rule a: Untuk kelas 1 dan 2 (isG12Class): setelah jam ke-3, semua sel dikosongkan
+                        if (isG12Class) {
+                          if (col.label === "Al-Kahfi" || col.type === "ishoma" || (col.type === "jp" && col.jpNumber !== undefined && col.jpNumber >= 4)) {
+                            showAsPulang = true;
+                          }
+                        }
+                        
+                        // Rule b: Untuk kelas 3 sampai 11 (!isG12Class && !isGrade12Class): setelah Al-Kahfi, semua sel dikosongkan
+                        if (!isG12Class && !isGrade12Class) {
+                          if (col.type === "ishoma" || (col.type === "jp" && col.jpNumber !== undefined && col.jpNumber >= 4)) {
+                            showAsPulang = true;
+                          }
+                        }
+
+                        if (showAsPulang) {
+                          return (
+                            <td key={`cell-fri-${idx}`} className="p-3 border-r border-slate-200 bg-slate-50/20 text-center text-xs text-slate-300 italic align-middle select-none">
+                              <div className="font-semibold text-slate-400">Pulang</div>
+                              <div className="text-[9px] mt-0.5 text-slate-400">{col.timeRange}</div>
+                            </td>
+                          );
+                        }
+
                         if (col.type === "jp" && col.jpNumber !== undefined) {
                           const jam = col.jpNumber;
-                          
-                          // Rule check: Hari jum'at untuk kelas 1-11, setelah JP 3 tulis kosong
-                          const isAfterJP3 = jam >= 4;
-                          const isClass1to11 = !isGrade12Class;
-                          
-                          const showAsKosong = isAfterJP3 && isClass1to11;
-                          const items = showAsKosong ? [] : (scheduleMap["Jumat"][jam] || []);
+                          const items = scheduleMap["Jumat"][jam] || [];
 
                           if (items.length > 0) {
                             const displayMapel = items.map(i => i.mapel).join(" & ");
@@ -704,28 +850,15 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                               </td>
                             );
                           } else {
-                            // Empty Friday cell
-                            const displayLabel = (isG12Class && jam >= 3) ? "Pulang" : "Kosong";
                             return (
                               <td key={`cell-fri-${idx}`} className="p-3 border-r border-slate-200 bg-slate-50/20 text-center text-xs text-slate-300 italic align-middle">
-                                <div className="font-medium">{displayLabel}</div>
+                                <div className="font-medium">Kosong</div>
                                 <div className="text-[9px] mt-0.5 text-slate-400">{col.timeRange}</div>
                               </td>
                             );
                           }
                         } else if (col.type === "break" || col.type === "ishoma") {
                           const colors = getBreakColors(classType);
-                          const isAlKahfiOrIshoma = col.label === "Al-Kahfi" || col.label === "Ishoma";
-                          
-                          if (isAlKahfiOrIshoma && isG12Class) {
-                            return (
-                              <td key={`cell-fri-${idx}`} className="p-3 border-r border-slate-200 bg-slate-50/20 text-center text-xs text-slate-300 italic align-middle">
-                                <div className="font-medium">Pulang</div>
-                                <div className="text-[9px] mt-0.5 text-slate-400">{col.timeRange}</div>
-                              </td>
-                            );
-                          }
-
                           return (
                             <td 
                               key={`cell-fri-${idx}`} 
@@ -760,15 +893,37 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                           const isFriday = hari === "Jumat";
                           const currentCols = isFriday ? fridayColumns : columns;
                           return currentCols.map((col, idx) => {
+                            let showAsPulang = false;
+                            if (isFriday) {
+                              if (isG12Class) {
+                                if (col.label === "Al-Kahfi" || col.type === "ishoma" || (col.type === "jp" && col.jpNumber !== undefined && col.jpNumber >= 4)) {
+                                  showAsPulang = true;
+                                }
+                              }
+                              if (!isG12Class && !isGrade12Class) {
+                                if (col.type === "ishoma" || (col.type === "jp" && col.jpNumber !== undefined && col.jpNumber >= 4)) {
+                                  showAsPulang = true;
+                                }
+                              }
+                            }
+
+                            if (showAsPulang) {
+                              return (
+                                <div 
+                                  key={`mob-cell-${idx}`}
+                                  className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-400 text-xs italic flex justify-between"
+                                >
+                                  <span className="font-medium text-slate-400">
+                                    {col.type === "jp" ? `Jam ${col.jpNumber}` : col.label} ({col.timeRange})
+                                  </span>
+                                  <span className="font-semibold text-slate-500">Pulang</span>
+                                </div>
+                              );
+                            }
+
                             if (col.type === "jp" && col.jpNumber !== undefined) {
                               const jam = col.jpNumber;
-                              
-                              // Check Friday rules
-                              const isAfterJP3 = jam >= 4;
-                              const isClass1to11 = !isGrade12Class;
-                              const showAsKosong = isFriday && isAfterJP3 && isClass1to11;
-
-                              const items = showAsKosong ? [] : (scheduleMap[hari][jam] || []);
+                              const items = scheduleMap[hari][jam] || [];
 
                               if (items.length > 0) {
                                 const displayMapel = items.map(i => i.mapel).join(" & ");
@@ -801,32 +956,18 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                                   </div>
                                 );
                               } else {
-                                const displayLabel = (isFriday && isG12Class && jam >= 3) ? "Pulang" : "Kosong";
                                 return (
                                   <div 
                                     key={`mob-cell-${idx}`}
                                     className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-400 text-xs italic flex justify-between"
                                   >
                                     <span className="font-medium text-slate-400">Jam {jam} ({col.timeRange})</span>
-                                    <span className="font-semibold">{displayLabel}</span>
+                                    <span className="font-semibold text-slate-400">Kosong</span>
                                   </div>
                                 );
                               }
                             } else if (col.type === "break" || col.type === "ishoma") {
                               const colors = getBreakColors(classType);
-                              const isAlKahfiOrIshoma = col.label === "Al-Kahfi" || col.label === "Ishoma";
-                              
-                              if (isFriday && isAlKahfiOrIshoma && isG12Class) {
-                                return (
-                                  <div 
-                                    key={`mob-cell-${idx}`}
-                                    className="p-2.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/30 text-slate-400 text-xs italic flex justify-between"
-                                  >
-                                    <span className="font-medium text-slate-400">{col.label} ({col.timeRange})</span>
-                                    <span className="font-semibold text-slate-500">Pulang</span>
-                                  </div>
-                                );
-                              }
 
                               return (
                                 <div 

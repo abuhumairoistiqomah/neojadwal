@@ -8,6 +8,7 @@ export const INITIAL_ACCOUNTS: AdminAccount[] = [
 export const INITIAL_TEACHERS: Teacher[] = [
   {
     nama: "OSY BENU ISMAIL, S.Pd.",
+    panggilan: "OSY",
     mapel_utama: "English",
     rumpun: "English",
     jenjang: "SD",
@@ -17,6 +18,7 @@ export const INITIAL_TEACHERS: Teacher[] = [
   },
   {
     nama: "ISTIQOMAH ASY SAYFULLOH, M.Pd",
+    panggilan: "ISTIQOMAH",
     mapel_utama: "Math",
     rumpun: "Math",
     jenjang: "SD",
@@ -26,15 +28,17 @@ export const INITIAL_TEACHERS: Teacher[] = [
   },
   {
     nama: "MUHAMAD JAKI FARHANSYAH, S.H.",
+    panggilan: "FARHAN",
     mapel_utama: "SKI, Akidah Akhlaq",
     rumpun: "Diniyah",
-    jenjang: "SD",
+    jenjang: "SD, SMP",
     tugas_tambahan: "Manajemen",
     keterangan: "",
     is_manajemen: true
   },
   {
     nama: "HAFASH UBAIDILLAH, Lc., M.S.I.",
+    panggilan: "HAFASH",
     mapel_utama: "Akidah",
     rumpun: "Diniyah",
     jenjang: "SMP",
@@ -44,6 +48,7 @@ export const INITIAL_TEACHERS: Teacher[] = [
   },
   {
     nama: "ADJI HAERUN MUTAKIN, M.Pd",
+    panggilan: "ADJI",
     mapel_utama: "Arabic",
     rumpun: "Diniyah",
     jenjang: "SMP, SMA",
@@ -53,6 +58,7 @@ export const INITIAL_TEACHERS: Teacher[] = [
   },
   {
     nama: "JAVIER NOVAL ATHALLAH, S.Si.",
+    panggilan: "JAVIER",
     mapel_utama: "Math",
     rumpun: "Math",
     jenjang: "SD, SMA",
@@ -62,6 +68,7 @@ export const INITIAL_TEACHERS: Teacher[] = [
   },
   {
     nama: "ENDANG IRAWAN, S.Pd",
+    panggilan: "ENDANG",
     mapel_utama: "English",
     rumpun: "English",
     jenjang: "SMP, SMA",
@@ -71,30 +78,153 @@ export const INITIAL_TEACHERS: Teacher[] = [
   },
   {
     nama: "MUHAMMAD RIJAL ABDURAHMAN, S.M.Gr.",
+    panggilan: "RIJAL",
     mapel_utama: "Math, Tematik Indo",
     rumpun: "Math",
     jenjang: "SD",
     tugas_tambahan: "Wali kelas",
-    keterangan: "01 INTER 1",
-    wali_kelas: "01 INTER 1"
+    keterangan: "01 INTER 1 I",
+    wali_kelas: "01 INTER 1 I"
   },
   {
     nama: "HUDZAIFAH AZZAM, B.A.",
+    panggilan: "AZZAM",
     mapel_utama: "SKI, Akidah Akhlaq, Fiqh, Akhlaq, Arabic",
     rumpun: "Diniyah",
     jenjang: "SD, SMP",
     tugas_tambahan: "Wali kelas",
-    keterangan: "02 INTER 2",
-    wali_kelas: "02 INTER 2"
+    keterangan: "02 INTER 2 I",
+    wali_kelas: "02 INTER 2 I"
   },
   {
     nama: "BINTANG PARAMITHA",
+    panggilan: "BINTANG",
     mapel_utama: "English",
     rumpun: "English",
     jenjang: "SD",
     tugas_tambahan: "Wali kelas",
-    keterangan: "01 INTER 4",
-    wali_kelas: "01 INTER 4"
+    keterangan: "01 INTER 4 A",
+    wali_kelas: "01 INTER 4 A"
+  },
+  {
+    nama: "NURLAILY APRIANI, S.Pd.",
+    panggilan: "LAILY",
+    mapel_utama: "Al-Qur'an",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "01 INTER 5 A",
+    wali_kelas: "01 INTER 5 A"
+  },
+  {
+    nama: "MASYAUMUL JUM'AH DANIBAO, S.Ag.",
+    panggilan: "UMUL",
+    mapel_utama: "Al-Qur'an, Fiqh",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "02 INTER 1 I",
+    wali_kelas: "02 INTER 1 I"
+  },
+  {
+    nama: "AGIL AL GHOZALI, S.Pd.",
+    panggilan: "AGIL",
+    mapel_utama: "Arabic, Fiqh",
+    rumpun: "Diniyah",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "01 INTER 2 I",
+    wali_kelas: "01 INTER 2 I"
+  },
+  {
+    nama: "RAFI ILYASA SYUJA, S.Pd.",
+    panggilan: "SYUJA",
+    mapel_utama: "Al-Qur'an, Tematik Indo",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "02 INTER 3 I",
+    wali_kelas: "02 INTER 3 I"
+  },
+  {
+    nama: "AIDAH FAUZIAH, B.A.",
+    panggilan: "AIDAH",
+    mapel_utama: "Arabic, Fiqh, Akidah Akhlaq",
+    rumpun: "Diniyah",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "02 INTER 4 A",
+    wali_kelas: "02 INTER 4 A"
+  },
+  {
+    nama: "IDA NURJELITA SANI, M.Pd",
+    panggilan: "IDA",
+    mapel_utama: "Science",
+    rumpun: "Science",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "02 INTER 5 A",
+    wali_kelas: "02 INTER 5 A"
+  },
+  {
+    nama: "LALU MUHAMAD FATHONI, S.Pd",
+    panggilan: "LALU",
+    mapel_utama: "Al-Qur'an",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "03 INTER 1 I",
+    wali_kelas: "03 INTER 1 I"
+  },
+  {
+    nama: "SALMAN AL FARISI, S.Pd.",
+    panggilan: "SALMAN F",
+    mapel_utama: "SKI, Al-Qur'an",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "03 INTER 2 I",
+    wali_kelas: "03 INTER 2 I"
+  },
+  {
+    nama: "AMATURRAHIM, B.Sh.",
+    panggilan: "AMA",
+    mapel_utama: "Akidah Akhlaq, Arabic, SKI",
+    rumpun: "Diniyah",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "03 INTER 3 A",
+    wali_kelas: "03 INTER 3 A"
+  },
+  {
+    nama: "SYIFA NABILA NAJLA PUTRI, S.Pd",
+    panggilan: "SYIFA",
+    mapel_utama: "Al-Qur'an, Fiqh",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "03 INTER 4 A",
+    wali_kelas: "03 INTER 4 A"
+  },
+  {
+    nama: "MUHAMMAD DAHYAL AFKAR, S.Pd.",
+    panggilan: "AFKAR",
+    mapel_utama: "Al-Qur'an, SKI, Akidah Akhlaq",
+    rumpun: "Al-Qur'an",
+    jenjang: "SD, SMP",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "04 INTER 1 I",
+    wali_kelas: "04 INTER 1 I"
+  },
+  {
+    nama: "SALMAN ALVARIZI, S.Pd.",
+    panggilan: "SALMAN V",
+    mapel_utama: "Fiqh, Akidah Akhlaq, SKI",
+    rumpun: "Diniyah",
+    jenjang: "SD",
+    tugas_tambahan: "Wali kelas",
+    keterangan: "04 INTER 2 I",
+    wali_kelas: "04 INTER 2 I"
   }
 ];
 

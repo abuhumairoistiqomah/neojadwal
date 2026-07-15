@@ -14,6 +14,13 @@ interface JadwalLengkapProps {
 const HARI_LIST = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const;
 const JAM_LIST = [1, 2, 3, 4, 5, 6];
 
+// Helper to check if Grade 1 or 2
+export const isGrade1Or2 = (className: string): boolean => {
+  if (!className) return false;
+  const name = className.trim().toLowerCase();
+  return /^(0?1|0?2)\b|^(0?1|0?2)[a-z]/i.test(name) || /class\s*(0?1|0?2)\b/i.test(name) || /grade\s*(0?1|0?2)\b/i.test(name) || /primary\s*(0?1|0?2)\b/i.test(name);
+};
+
 export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
   teachers,
   schedules,
@@ -242,7 +249,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                               <div className="font-extrabold text-xs sm:text-sm leading-tight">{displayMapel}</div>
                               <div className="text-xs font-bold mt-1 opacity-90">Kelas {displayKelas}</div>
                               <div className="text-[10px] mt-0.5 opacity-75">
-                                {firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : ""}
+                                {(() => {
+                                  const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(hari);
+                                  const hasG12 = items.some(i => isGrade1Or2(i.kelas));
+                                  if (isMonToThu && hasG12 && jam === 6) {
+                                    return "14:00 - 14:20";
+                                  }
+                                  return firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : "";
+                                })()}
                               </div>
                               <div className="block">{badge}</div>
                             </td>
@@ -335,7 +349,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                     Jam {jam}
                                   </span>
                                   <span className="text-xs font-medium opacity-80">
-                                    {firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : JAM_TIME_MAP[jam]}
+                                    {(() => {
+                                      const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(hari);
+                                      const hasG12 = items.some(i => isGrade1Or2(i.kelas));
+                                      if (isMonToThu && hasG12 && jam === 6) {
+                                        return "14:00 - 14:20";
+                                      }
+                                      return firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : JAM_TIME_MAP[jam];
+                                    })()}
                                   </span>
                                   <h4 className="font-bold text-sm mt-1">{displayMapel}</h4>
                                   <div className="mt-1">{badge}</div>

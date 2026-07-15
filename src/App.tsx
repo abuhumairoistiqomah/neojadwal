@@ -70,11 +70,14 @@ export default function App() {
   const headerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   // Google Apps Script API configuration
-  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec";
+  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec";
   const [apiUrl, setApiUrl] = useState<string>(() => {
     const val = localStorage.getItem("db_api_url");
-    const oldDefault = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
-    if (val === null || val === oldDefault) {
+    const oldDefaults = [
+      "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
+      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec"
+    ];
+    if (val === null || oldDefaults.includes(val)) {
       localStorage.setItem("db_api_url", DEFAULT_API_URL);
       return DEFAULT_API_URL;
     }
@@ -82,8 +85,11 @@ export default function App() {
   });
   const [apiConnected, setApiConnected] = useState<boolean>(() => {
     const val = localStorage.getItem("db_api_url");
-    const oldDefault = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
-    if (val === null || val === oldDefault) return true;
+    const oldDefaults = [
+      "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
+      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec"
+    ];
+    if (val === null || oldDefaults.includes(val)) return true;
     return val !== "";
   });
   const [isLoadingApi, setIsLoadingApi] = useState<boolean>(false);
@@ -99,8 +105,11 @@ export default function App() {
     const storedLogs = localStorage.getItem("db_logs");
     
     let storedApiUrl = localStorage.getItem("db_api_url");
-    const oldDefault = "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec";
-    if (storedApiUrl === null || storedApiUrl === oldDefault) {
+    const oldDefaults = [
+      "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
+      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec"
+    ];
+    if (storedApiUrl === null || oldDefaults.includes(storedApiUrl)) {
       storedApiUrl = DEFAULT_API_URL;
       localStorage.setItem("db_api_url", DEFAULT_API_URL);
     }
@@ -260,13 +269,36 @@ export default function App() {
         const logIzin = data.Log_Izin || [];
 
         // Derive properties from spreadsheet columns to keep backward compatibility
-        const mappedTeachers = masterGuru.map((t: any) => ({
-          ...t,
-          panggilan: t.panggilan !== undefined ? t.panggilan : (t.Panggilan !== undefined ? t.Panggilan : null),
-          wali_kelas: t.wali_kelas !== undefined ? t.wali_kelas : (t.tugas_tambahan?.toLowerCase().includes("wali") ? t.keterangan : null),
-          pendamping_kelas: t.pendamping_kelas !== undefined ? t.pendamping_kelas : (t.tugas_tambahan?.toLowerCase().includes("pendamping") ? t.keterangan : null),
-          is_manajemen: t.is_manajemen !== undefined ? t.is_manajemen : (t.tugas_tambahan?.toLowerCase().includes("manajemen") || false)
-        }));
+        const mappedTeachers = masterGuru.map((t: any) => {
+          const rawNama = t.nama !== undefined ? t.nama : (t["Nama Guru"] !== undefined ? t["Nama Guru"] : (t.nama_guru !== undefined ? t.nama_guru : (t.namaGuru !== undefined ? t.namaGuru : "")));
+          const rawPanggilan = t.panggilan !== undefined ? t.panggilan : (t["Panggilan"] !== undefined ? t["Panggilan"] : (t.Panggilan !== undefined ? t.Panggilan : ""));
+          const rawMapel = t.mapel_utama !== undefined ? t.mapel_utama : (t["Mapel"] !== undefined ? t["Mapel"] : (t.mapel !== undefined ? t.mapel : ""));
+          const rawRumpun = t.rumpun !== undefined ? t.rumpun : (t["Rumpun"] !== undefined ? t["Rumpun"] : "");
+          const rawJenjang = t.jenjang !== undefined ? t.jenjang : (t["Jenjang"] !== undefined ? t["Jenjang"] : "");
+          const rawTugas = t.tugas_tambahan !== undefined ? t.tugas_tambahan : (t["Tugas Tambahan"] !== undefined ? t["Tugas Tambahan"] : (t.tugas_tambahan_pns_nonpns !== undefined ? t.tugas_tambahan_pns_nonpns : ""));
+          const rawKeterangan = t.keterangan !== undefined ? t.keterangan : (t["Keterangan"] !== undefined ? t["Keterangan"] : "");
+
+          const nameStr = typeof rawNama === "string" ? rawNama.trim() : String(rawNama || "");
+          const panggilanStr = typeof rawPanggilan === "string" ? rawPanggilan.trim() : (rawPanggilan ? String(rawPanggilan).trim() : null);
+          const mapelStr = typeof rawMapel === "string" ? rawMapel.trim() : String(rawMapel || "");
+          const rumpunStr = typeof rawRumpun === "string" ? rawRumpun.trim() : String(rawRumpun || "");
+          const jenjangStr = typeof rawJenjang === "string" ? rawJenjang.trim() : String(rawJenjang || "");
+          const tugasStr = typeof rawTugas === "string" ? rawTugas.trim() : String(rawTugas || "");
+          const keteranganStr = typeof rawKeterangan === "string" ? rawKeterangan.trim() : String(rawKeterangan || "");
+
+          return {
+            nama: nameStr,
+            panggilan: panggilanStr,
+            mapel_utama: mapelStr,
+            rumpun: rumpunStr,
+            jenjang: jenjangStr,
+            tugas_tambahan: tugasStr,
+            keterangan: keteranganStr,
+            wali_kelas: t.wali_kelas !== undefined ? t.wali_kelas : (t.waliKelas !== undefined ? t.waliKelas : (tugasStr.toLowerCase().includes("wali") ? keteranganStr : null)),
+            pendamping_kelas: t.pendamping_kelas !== undefined ? t.pendamping_kelas : (t.pendampingKelas !== undefined ? t.pendampingKelas : (tugasStr.toLowerCase().includes("pendamping") ? keteranganStr : null)),
+            is_manajemen: t.is_manajemen !== undefined ? t.is_manajemen : (t.isManajemen !== undefined ? t.isManajemen : (tugasStr.toLowerCase().includes("manajemen") || false))
+          };
+        });
 
         saveTeachers(mappedTeachers);
         saveSchedules(jadwal);

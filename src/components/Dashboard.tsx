@@ -14,6 +14,13 @@ export const JAM_TIME_MAP: Record<number, string> = {
   6: "11:45 - 12:30"
 };
 
+// Helper to check if Grade 1 or 2
+export const isGrade1Or2 = (className: string): boolean => {
+  if (!className) return false;
+  const name = className.trim().toLowerCase();
+  return /^(0?1|0?2)\b|^(0?1|0?2)[a-z]/i.test(name) || /class\s*(0?1|0?2)\b/i.test(name) || /grade\s*(0?1|0?2)\b/i.test(name) || /primary\s*(0?1|0?2)\b/i.test(name);
+};
+
 interface DashboardProps {
   teachers: Teacher[];
   schedules: ScheduleItem[];
@@ -306,7 +313,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             Jam Ke-{item.jam_ke}
                           </span>
                           <span className="text-sm font-medium opacity-85">
-                            {item.mulai && item.selesai ? `${item.mulai} - ${item.selesai}` : JAM_TIME_MAP[item.jam_ke]}
+                            {(() => {
+                              const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(selectedDay);
+                              const hasG12 = item.items.some(i => isGrade1Or2(i.kelas));
+                              if (isMonToThu && hasG12 && item.jam_ke === 6) {
+                                return "14:00 - 14:20";
+                              }
+                              return item.mulai && item.selesai ? `${item.mulai} - ${item.selesai}` : JAM_TIME_MAP[item.jam_ke];
+                            })()}
                           </span>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${tagClass}`}>
                             {labelText}
