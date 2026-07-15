@@ -259,6 +259,39 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                 })()}
                               </div>
                               <div className="block">{badge}</div>
+                              
+                              {/* Other Teachers Badge List if > 2 teachers are teaching */}
+                              {(() => {
+                                const otherTeachersList: string[] = [];
+                                items.forEach(scItem => {
+                                  const scTeachers = [
+                                    scItem.guru1,
+                                    scItem.guru2,
+                                    scItem.guru3,
+                                    scItem.guru4,
+                                    scItem.guru5,
+                                    scItem.guru6
+                                  ].map(g => g?.trim()).filter(Boolean);
+                                  
+                                  if (scTeachers.length > 2) {
+                                    scTeachers.forEach(tName => {
+                                      if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                        otherTeachersList.push(tName);
+                                      }
+                                    });
+                                  }
+                                });
+
+                                if (otherTeachersList.length > 0) {
+                                  return (
+                                    <div className="mt-1.5 text-[8px] bg-white/70 border border-slate-200/50 p-1 rounded leading-normal font-medium text-slate-600 text-center">
+                                      <div className="font-extrabold text-[7px] uppercase tracking-wider text-slate-400">Team Teaching:</div>
+                                      <div className="truncate" title={otherTeachersList.join(", ")}>{otherTeachersList.join(", ")}</div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </td>
                           );
                         } else {
@@ -360,6 +393,43 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                   </span>
                                   <h4 className="font-bold text-sm mt-1">{displayMapel}</h4>
                                   <div className="mt-1">{badge}</div>
+                                  
+                                  {/* Other Teachers Badge List if > 2 teachers are teaching */}
+                                  {(() => {
+                                    const otherTeachersList: string[] = [];
+                                    items.forEach(scItem => {
+                                      const scTeachers = [
+                                        scItem.guru1,
+                                        scItem.guru2,
+                                        scItem.guru3,
+                                        scItem.guru4,
+                                        scItem.guru5,
+                                        scItem.guru6
+                                      ].map(g => g?.trim()).filter(Boolean);
+                                      
+                                      if (scTeachers.length > 2) {
+                                        scTeachers.forEach(tName => {
+                                          if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                            otherTeachersList.push(tName);
+                                          }
+                                        });
+                                      }
+                                    });
+
+                                    if (otherTeachersList.length > 0) {
+                                      return (
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-1 bg-white/60 border border-slate-200/50 px-2 py-1 rounded text-[10px]">
+                                          <span className="font-bold text-slate-500 uppercase text-[8px] tracking-wider block mr-0.5">Team Teaching:</span>
+                                          {otherTeachersList.map((tName, idx) => (
+                                            <span key={idx} className="bg-white border border-slate-200 text-slate-700 px-1.5 py-0.25 rounded font-semibold">
+                                              {tName}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                                 <div className="text-right text-xs">
                                   <span className="block font-bold">Kelas {displayKelas}</span>

@@ -327,6 +327,43 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </span>
                         </div>
                         <h4 className="font-bold text-lg">{item.mapel}</h4>
+                        
+                        {/* Other Teachers Badge List if > 2 teachers are teaching */}
+                        {(() => {
+                          const otherTeachersList: string[] = [];
+                          item.items.forEach(scItem => {
+                            const scTeachers = [
+                              scItem.guru1,
+                              scItem.guru2,
+                              scItem.guru3,
+                              scItem.guru4,
+                              scItem.guru5,
+                              scItem.guru6
+                            ].map(g => g?.trim()).filter(Boolean);
+                            
+                            if (scTeachers.length > 2) {
+                              scTeachers.forEach(tName => {
+                                if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                  otherTeachersList.push(tName);
+                                }
+                              });
+                            }
+                          });
+
+                          if (otherTeachersList.length > 0) {
+                            return (
+                              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 bg-white/60 border border-slate-200/50 px-3 py-1.5 rounded-lg text-xs">
+                                <span className="font-bold text-slate-500 uppercase text-[9px] tracking-wider block mr-1">Team Teaching:</span>
+                                {otherTeachersList.map((tName, idx) => (
+                                  <span key={idx} className="bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-semibold shadow-2xs">
+                                    {tName}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
 
                       <div className="flex items-center gap-6 text-sm">
