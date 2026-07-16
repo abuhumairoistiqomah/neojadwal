@@ -18,7 +18,7 @@ import {
   ShieldAlert, ShieldCheck, Database, LogIn, LogOut, 
   HelpCircle, Wifi, WifiOff, RefreshCw, Layers,
   Menu, X, Home, Calendar, BookOpen, Clock, Users, UserPlus, 
-  History, BarChart2, Search
+  History, BarChart2, Search, Upload
 } from "lucide-react";
 import { AdminAccount } from "./types";
 
@@ -70,12 +70,14 @@ export default function App() {
   const headerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   // Google Apps Script API configuration
-  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec";
+  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec";
   const [apiUrl, setApiUrl] = useState<string>(() => {
     const val = localStorage.getItem("db_api_url");
     const oldDefaults = [
       "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
-      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec"
+      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
+      "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
+      "https://script.google.com/macros/s/AKfycbyqmK6N1Fzkm5irhbYKrA3knrOKllh8Acd4aYDkRD96pn6uGYCW7pFRjxNs-pvM13phSA/exec"
     ];
     if (val === null || oldDefaults.includes(val)) {
       localStorage.setItem("db_api_url", DEFAULT_API_URL);
@@ -87,7 +89,9 @@ export default function App() {
     const val = localStorage.getItem("db_api_url");
     const oldDefaults = [
       "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
-      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec"
+      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
+      "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
+      "https://script.google.com/macros/s/AKfycbyqmK6N1Fzkm5irhbYKrA3knrOKllh8Acd4aYDkRD96pn6uGYCW7pFRjxNs-pvM13phSA/exec"
     ];
     if (val === null || oldDefaults.includes(val)) return true;
     return val !== "";
@@ -107,7 +111,9 @@ export default function App() {
     let storedApiUrl = localStorage.getItem("db_api_url");
     const oldDefaults = [
       "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
-      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec"
+      "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
+      "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
+      "https://script.google.com/macros/s/AKfycbyqmK6N1Fzkm5irhbYKrA3knrOKllh8Acd4aYDkRD96pn6uGYCW7pFRjxNs-pvM13phSA/exec"
     ];
     if (storedApiUrl === null || oldDefaults.includes(storedApiUrl)) {
       storedApiUrl = DEFAULT_API_URL;
@@ -761,6 +767,8 @@ export default function App() {
               <JadwalKelas 
                 teachers={teachers}
                 schedules={schedules}
+                isAdmin={isAdmin}
+                onUpdateSchedules={saveSchedules}
                 onBack={() => setActivePage("dashboard")}
               />
             )}
@@ -908,41 +916,43 @@ export default function App() {
               </p>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 text-xs">
-              <button
-                id="disconnect-api-btn"
-                type="button"
-                onClick={() => {
-                  setApiUrl("");
-                  setApiConnected(false);
-                  localStorage.setItem("db_api_url", "");
-                  setShowConfigModal(false);
-                }}
-                className="px-3 py-1.5 hover:bg-slate-100 text-slate-500 font-semibold rounded-lg transition-colors"
-              >
-                Putuskan Sambungan
-              </button>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 text-xs">
+              <div className="flex gap-2 ml-auto">
+                <button
+                  id="disconnect-api-btn"
+                  type="button"
+                  onClick={() => {
+                    setApiUrl("");
+                    setApiConnected(false);
+                    localStorage.setItem("db_api_url", "");
+                    setShowConfigModal(false);
+                  }}
+                  className="px-3 py-1.5 hover:bg-slate-100 text-slate-500 font-semibold rounded-lg transition-colors"
+                >
+                  Putuskan Sambungan
+                </button>
 
-              <button
-                id="connect-api-btn"
-                type="button"
-                onClick={async () => {
-                  if (apiUrl) {
-                    const success = await fetchFromAppsScript(apiUrl);
-                    if (success) {
-                      setShowConfigModal(false);
-                      alert("Database berhasil terhubung dan disinkronkan dengan Google Sheets!");
+                <button
+                  id="connect-api-btn"
+                  type="button"
+                  onClick={async () => {
+                    if (apiUrl) {
+                      const success = await fetchFromAppsScript(apiUrl);
+                      if (success) {
+                        setShowConfigModal(false);
+                        alert("Database berhasil terhubung dan disinkronkan dengan Google Sheets!");
+                      }
+                    } else {
+                      alert("Masukkan URL API terlebih dahulu.");
                     }
-                  } else {
-                    alert("Masukkan URL API terlebih dahulu.");
-                  }
-                }}
-                disabled={isLoadingApi}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-              >
-                {isLoadingApi && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                {isLoadingApi ? "Menghubungkan..." : "Hubungkan & Ambil Data"}
-              </button>
+                  }}
+                  disabled={isLoadingApi}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                >
+                  {isLoadingApi && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  {isLoadingApi ? "Menghubungkan..." : "Hubungkan & Ambil Data"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

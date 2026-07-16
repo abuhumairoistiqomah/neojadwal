@@ -7,6 +7,8 @@ interface JadwalKelasProps {
   teachers: Teacher[];
   schedules: ScheduleItem[];
   onBack: () => void;
+  isAdmin?: boolean;
+  onUpdateSchedules?: (data: ScheduleItem[]) => void;
 }
 
 const HARI_LIST = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const;
@@ -178,15 +180,149 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
   teachers,
   schedules,
   onBack,
+  isAdmin = false,
+  onUpdateSchedules,
 }) => {
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Companion edit state
+  const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
+  const [editingError, setEditingError] = useState<string | null>(null);
+
+  // Compute total weekly JP for each teacher from schedules (detecting combined classes: count same day + period as 1 JP)
+  const teacherJpMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    const teacherSlots: Record<string, Set<string>> = {};
+
+    teachers.forEach(t => {
+      if (t && t.nama) {
+        map[t.nama] = 0;
+        teacherSlots[t.nama] = new Set<string>();
+      }
+    });
+
+    schedules.forEach(s => {
+      const dayKey = (s.hari || "").trim().toLowerCase();
+      const periodKey = s.jam_ke;
+      const slotKey = `${dayKey}-${periodKey}`;
+
+      [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].forEach(g => {
+        if (g) {
+          const trimmed = g.trim();
+          if (!teacherSlots[trimmed]) {
+            teacherSlots[trimmed] = new Set<string>();
+          }
+          teacherSlots[trimmed].add(slotKey);
+        }
+      });
+    });
+
+    // Translate sets to count map
+    Object.keys(teacherSlots).forEach(name => {
+      map[name] = teacherSlots[name].size;
+    });
+
+    return map;
+  }, [teachers, schedules]);
+
+  // Sort available teachers for the dropdown
+  const availableTeachers = useMemo(() => {
+    return teachers
+      .filter(t => {
+        const nameLower = (t.nama || "").toLowerCase();
+        const tugasLower = (t.tugas_tambahan || "").toLowerCase();
+        const rumpunLower = (t.rumpun || "").toLowerCase();
+        const ketLower = (t.keterangan || "").toLowerCase();
+        
+        // Exclude Manajemen & Komisi completely
+        const isManajemen = t.is_manajemen === true || 
+                            tugasLower.includes("manajemen") || 
+                            nameLower.includes("manajemen") ||
+                            rumpunLower.includes("manajemen") ||
+                            ketLower.includes("manajemen");
+        const isKomisi = tugasLower.includes("komisi") || 
+                         nameLower.includes("komisi") ||
+                         rumpunLower.includes("komisi") ||
+                         ketLower.includes("komisi");
+                         
+        return !isManajemen && !isKomisi;
+      })
+      .map(t => {
+        const jp = teacherJpMap[t.nama] || 0;
+        return {
+          nama: t.nama,
+          jp,
+          panggilan: t.panggilan || ""
+        };
+      })
+      .sort((a, b) => {
+        if (a.jp !== b.jp) return a.jp - b.jp;
+        return a.nama.localeCompare(b.nama);
+      });
+  }, [teachers, teacherJpMap]);
+
+  const handleAddCompanion = (scheduleId: string, teacherName: string) => {
+    if (!onUpdateSchedules) return;
+    let errorOccurred = false;
+    const updatedSchedules = schedules.map(s => {
+      if (s.id === scheduleId) {
+        if (!s.guru2) return { ...s, guru2: teacherName };
+        if (!s.guru3) return { ...s, guru3: teacherName };
+        if (!s.guru4) return { ...s, guru4: teacherName };
+        if (!s.guru5) return { ...s, guru5: teacherName };
+        if (!s.guru6) return { ...s, guru6: teacherName };
+        errorOccurred = true;
+      }
+      return s;
+    });
+
+    if (errorOccurred) {
+      setEditingError("Batas maksimal 6 guru (1 utama + 5 pendamping) sudah tercapai.");
+      return;
+    }
+
+    onUpdateSchedules(updatedSchedules);
+    setEditingError(null);
+
+    const newEditingItem = updatedSchedules.find(s => s.id === scheduleId);
+    if (newEditingItem) {
+      setEditingItem(newEditingItem);
+    }
+  };
+
+  const handleRemoveCompanion = (scheduleId: string, fieldKey: 'guru2' | 'guru3' | 'guru4' | 'guru5' | 'guru6') => {
+    if (!onUpdateSchedules) return;
+    const updatedSchedules = schedules.map(s => {
+      if (s.id === scheduleId) {
+        const updated = { ...s, [fieldKey]: "" };
+        const companions = [updated.guru2, updated.guru3, updated.guru4, updated.guru5, updated.guru6].filter(Boolean);
+        return {
+          ...updated,
+          guru2: companions[0] || "",
+          guru3: companions[1] || "",
+          guru4: companions[2] || "",
+          guru5: companions[3] || "",
+          guru6: companions[4] || "",
+        };
+      }
+      return s;
+    });
+
+    onUpdateSchedules(updatedSchedules);
+    setEditingError(null);
+
+    const newEditingItem = updatedSchedules.find(s => s.id === scheduleId);
+    if (newEditingItem) {
+      setEditingItem(newEditingItem);
+    }
+  };
+
   // Get all unique classes from schedule
   const uniqueClasses = useMemo(() => {
-    const classes = schedules.map(s => s.kelas.trim()).filter(Boolean);
+    const classes = schedules.map(s => (s.kelas || "").trim()).filter(Boolean);
     return [...new Set(classes)].sort();
   }, [schedules]);
 
@@ -199,7 +335,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
   // Filter schedules for the selected class
   const classSchedules = useMemo(() => {
     if (!selectedClass) return [];
-    return schedules.filter(s => s.kelas.trim().toLowerCase() === selectedClass.trim().toLowerCase());
+    return schedules.filter(s => (s.kelas || "").trim().toLowerCase() === selectedClass.trim().toLowerCase());
   }, [selectedClass, schedules]);
 
   // Determine class type of selected class
@@ -252,6 +388,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
     
     // Normalize teacher name by stripping common titles & degrees and special characters to allow resilient matching
     const normalizeTeacherName = (name: string): string => {
+      if (!name) return "";
       return name
         .toLowerCase()
         .replace(/(,?\s*(s\.pd|m\.pd|s\.h|lc|m\.s\.i|s\.si|s\.m\.gr|m\.pd\.i|s\.pd\.i|s\.kom|s\.e|s\.tp|s\.ag|b\.a)\.?)+$/gi, "")
@@ -262,13 +399,13 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
     const cleanFull = normalizeTeacherName(fullName);
     const matchedTeacher = teachers.find(t => {
       const cleanTeacherName = normalizeTeacherName(t.nama);
-      return cleanTeacherName === cleanFull || t.nama.trim().toLowerCase() === fullName.trim().toLowerCase();
+      return cleanTeacherName === cleanFull || (t.nama || "").trim().toLowerCase() === (fullName || "").trim().toLowerCase();
     });
 
     if (matchedTeacher && matchedTeacher.panggilan) {
-      return matchedTeacher.panggilan.trim();
+      return (matchedTeacher.panggilan || "").trim();
     }
-    return fullName.trim();
+    return (fullName || "").trim();
   };
 
   // Trigger standard browser printing for beautiful high-quality vector PDF (A4 Landscape)
@@ -723,7 +860,13 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                               return (
                                 <td 
                                   key={`cell-${idx}`} 
-                                  className="p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle"
+                                  onClick={() => isAdmin && setEditingItem(items[0])}
+                                  className={`p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle ${
+                                    isAdmin 
+                                      ? "cursor-pointer hover:bg-blue-100 hover:scale-[1.02] hover:shadow-md active:scale-[0.98]" 
+                                      : ""
+                                  }`}
+                                  title={isAdmin ? "Klik untuk mengedit Team Teaching" : undefined}
                                 >
                                   <div className="font-extrabold text-xs sm:text-sm leading-tight text-slate-800">{displayMapel}</div>
                                   <div className="text-[10px] font-bold mt-1 text-blue-800 line-clamp-2" title={displayGuru}>
@@ -838,7 +981,13 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                             return (
                               <td 
                                 key={`cell-fri-${idx}`} 
-                                className="p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle"
+                                onClick={() => isAdmin && setEditingItem(items[0])}
+                                className={`p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle ${
+                                  isAdmin 
+                                    ? "cursor-pointer hover:bg-blue-100 hover:scale-[1.02] hover:shadow-md active:scale-[0.98]" 
+                                    : ""
+                                }`}
+                                title={isAdmin ? "Klik untuk mengedit Team Teaching" : undefined}
                               >
                                 <div className="font-extrabold text-xs sm:text-sm leading-tight text-slate-800">{displayMapel}</div>
                                 <div className="text-[10px] font-bold mt-1 text-blue-800 line-clamp-2" title={displayGuru}>
@@ -939,7 +1088,13 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                                 return (
                                   <div 
                                     key={`mob-cell-${idx}`}
-                                    className="p-3 rounded-lg border border-blue-100 bg-blue-50/50 text-blue-900 flex items-center justify-between gap-3"
+                                    onClick={() => isAdmin && setEditingItem(items[0])}
+                                    className={`p-3 rounded-lg border border-blue-100 bg-blue-50/50 text-blue-900 flex items-center justify-between gap-3 ${
+                                      isAdmin 
+                                        ? "cursor-pointer hover:bg-blue-100/80 hover:ring-2 hover:ring-blue-400 transition-all active:scale-[0.98]" 
+                                        : ""
+                                    }`}
+                                    title={isAdmin ? "Klik untuk mengedit Team Teaching" : undefined}
                                   >
                                     <div>
                                       <span className="text-[9px] font-extrabold uppercase bg-white px-1.5 py-0.5 rounded mr-2 border border-blue-100 shadow-3xs text-blue-700">
@@ -1002,6 +1157,185 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
           </div>
         )}
       </div>
+
+      {/* Edit Companion Teacher Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-100 overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-5">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest bg-blue-600 px-2.5 py-0.5 rounded-full">
+                    Atur Team Teaching
+                  </span>
+                  <h3 className="text-lg font-black mt-2 leading-tight">
+                    {editingItem.kelas} &bull; {editingItem.mapel}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-1">
+                    Hari {editingItem.hari}, Jam ke-{editingItem.jam_ke} ({editingItem.mulai} - {editingItem.selesai})
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingItem(null);
+                    setEditingError(null);
+                  }}
+                  className="p-1 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Error Alert inside Modal */}
+              {editingError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold p-3.5 rounded-xl flex items-center gap-2 animate-bounce">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                  <span>{editingError}</span>
+                </div>
+              )}
+
+              {/* List of Teachers */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
+                  Daftar Guru Aktif
+                </h4>
+
+                <div className="space-y-2 divide-y divide-slate-100">
+                  {/* Guru 1: Main Teacher */}
+                  <div className="flex justify-between items-center py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                      <div>
+                        <span className="text-xs font-bold text-slate-800">
+                          {editingItem.guru1 || "Tanpa Guru Utama"}
+                        </span>
+                        <span className="block text-[10px] font-extrabold text-emerald-600 uppercase tracking-wide">
+                          Guru Utama (Main Teacher)
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                      {teacherJpMap[editingItem.guru1?.trim()] || 0} JP
+                    </span>
+                  </div>
+
+                  {/* Guru 2 - Guru 6: Companions */}
+                  {(['guru2', 'guru3', 'guru4', 'guru5', 'guru6'] as const).map((field, idx) => {
+                    const name = editingItem[field]?.trim();
+                    if (!name) return null;
+
+                    return (
+                      <div key={field} className="flex justify-between items-center py-2 pt-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                          <div>
+                            <span className="text-xs font-bold text-slate-800">{name}</span>
+                            <span className="block text-[10px] font-extrabold text-blue-600 uppercase tracking-wide">
+                              Companion {idx + 1}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 animate-fade-in">
+                          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                            {teacherJpMap[name] || 0} JP
+                          </span>
+                          <button
+                            onClick={() => handleRemoveCompanion(editingItem.id, field)}
+                            className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                            title="Hapus Guru Pendamping"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Add Companion Teacher Select Input */}
+              <div className="space-y-2">
+                <label className="text-xs font-extrabold text-slate-400 uppercase tracking-wider block">
+                  Tambah Guru Pendamping (Team Teaching)
+                </label>
+                <div className="relative">
+                  <select
+                    className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer text-slate-700 font-bold"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddCompanion(editingItem.id, e.target.value);
+                        e.target.value = ""; // reset
+                      }
+                    }}
+                  >
+                    <option value="">-- Pilih Guru --</option>
+                    {availableTeachers
+                      .filter(t => {
+                        const currentTeachers = [
+                          editingItem.guru1,
+                          editingItem.guru2,
+                          editingItem.guru3,
+                          editingItem.guru4,
+                          editingItem.guru5,
+                          editingItem.guru6
+                        ].map(name => name?.trim().toLowerCase());
+                        
+                        if (currentTeachers.includes((t.nama || "").trim().toLowerCase())) {
+                          return false;
+                        }
+
+                        // Ensure teacher doesn't have teaching duties (as guru1-guru6) in other slots at the same day and period
+                        const isTeachingAtSameTime = schedules.some(s => {
+                          const sameDay = (s.hari || "").trim().toLowerCase() === (editingItem.hari || "").trim().toLowerCase();
+                          const samePeriod = Number(s.jam_ke) === Number(editingItem.jam_ke);
+                          if (!sameDay || !samePeriod) return false;
+
+                          const teachersInSlot = [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6]
+                            .map(name => name?.trim().toLowerCase())
+                            .filter(Boolean);
+
+                          return teachersInSlot.includes((t.nama || "").trim().toLowerCase());
+                        });
+
+                        return !isTeachingAtSameTime;
+                      })
+                      .map(t => (
+                        <option key={t.nama} value={t.nama}>
+                          {t.nama} {t.panggilan ? `(${t.panggilan})` : ""} &bull; {t.jp} JP
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+                <p className="text-[10px] text-slate-400 font-semibold">
+                  Masing-masing nama guru dilengkapi dengan total JP mengajar minggu ini.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => {
+                  setEditingItem(null);
+                  setEditingError(null);
+                }}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

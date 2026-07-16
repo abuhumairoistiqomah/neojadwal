@@ -121,8 +121,9 @@ function doPost(e) {
   try {
     const ss = getSpreadsheet();
     const postData = JSON.parse(e.postData.contents);
-    const sheet = ss.getSheetByName("Log_Izin");
     
+    // Default: Log_Izin appending (legacy behavior)
+    const sheet = ss.getSheetByName("Log_Izin");
     if (!sheet) {
       throw new Error("Sheet Log_Izin tidak ditemukan!");
     }

@@ -260,7 +260,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                               </div>
                               <div className="block">{badge}</div>
                               
-                              {/* Other Teachers Badge List if > 2 teachers are teaching */}
+                              {/* Other Teachers Badge List if other teachers are teaching */}
                               {(() => {
                                 const otherTeachersList: string[] = [];
                                 items.forEach(scItem => {
@@ -273,13 +273,11 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                     scItem.guru6
                                   ].map(g => g?.trim()).filter(Boolean);
                                   
-                                  if (scTeachers.length > 2) {
-                                    scTeachers.forEach(tName => {
-                                      if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
-                                        otherTeachersList.push(tName);
-                                      }
-                                    });
-                                  }
+                                  scTeachers.forEach(tName => {
+                                    if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                      otherTeachersList.push(tName);
+                                    }
+                                  });
                                 });
 
                                 if (otherTeachersList.length > 0) {
@@ -394,7 +392,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                   <h4 className="font-bold text-sm mt-1">{displayMapel}</h4>
                                   <div className="mt-1">{badge}</div>
                                   
-                                  {/* Other Teachers Badge List if > 2 teachers are teaching */}
+                                  {/* Other Teachers Badge List if other teachers are teaching */}
                                   {(() => {
                                     const otherTeachersList: string[] = [];
                                     items.forEach(scItem => {
@@ -407,13 +405,11 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                         scItem.guru6
                                       ].map(g => g?.trim()).filter(Boolean);
                                       
-                                      if (scTeachers.length > 2) {
-                                        scTeachers.forEach(tName => {
-                                          if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
-                                            otherTeachersList.push(tName);
-                                          }
-                                        });
-                                      }
+                                      scTeachers.forEach(tName => {
+                                        if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                          otherTeachersList.push(tName);
+                                        }
+                                      });
                                     });
 
                                     if (otherTeachersList.length > 0) {

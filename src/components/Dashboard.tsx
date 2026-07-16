@@ -328,7 +328,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <h4 className="font-bold text-lg">{item.mapel}</h4>
                         
-                        {/* Other Teachers Badge List if > 2 teachers are teaching */}
+                        {/* Other Teachers Badge List if other teachers are teaching */}
                         {(() => {
                           const otherTeachersList: string[] = [];
                           item.items.forEach(scItem => {
@@ -341,13 +341,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               scItem.guru6
                             ].map(g => g?.trim()).filter(Boolean);
                             
-                            if (scTeachers.length > 2) {
-                              scTeachers.forEach(tName => {
-                                if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
-                                  otherTeachersList.push(tName);
-                                }
-                              });
-                            }
+                            scTeachers.forEach(tName => {
+                              if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                otherTeachersList.push(tName);
+                              }
+                            });
                           });
 
                           if (otherTeachersList.length > 0) {
