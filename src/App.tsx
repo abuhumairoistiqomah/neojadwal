@@ -14,11 +14,12 @@ import { JamKosongSemua } from "./components/JamKosongSemua";
 import { InputGuruPengganti } from "./components/InputGuruPengganti";
 import { LogGuruPengganti } from "./components/LogGuruPengganti";
 import { StatistikGuruPengganti } from "./components/StatistikGuruPengganti";
+import { RekapGuru } from "./components/RekapGuru";
 import { 
   ShieldAlert, ShieldCheck, Database, LogIn, LogOut, 
   HelpCircle, Wifi, WifiOff, RefreshCw, Layers,
   Menu, X, Home, Calendar, BookOpen, Clock, Users, UserPlus, 
-  History, BarChart2, Search, Upload
+  History, BarChart2, Search, Upload, ClipboardList
 } from "lucide-react";
 import { AdminAccount } from "./types";
 
@@ -46,7 +47,15 @@ export default function App() {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [logs, setLogs] = useState<LogIzinItem[]>([]);
   const [selectedTeacher, setSelectedTeacherState] = useState<string>("");
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    const storedAdmin = localStorage.getItem("db_is_admin");
+    return storedAdmin === "true";
+  });
+
+  // Keep admin status synced to localStorage
+  useEffect(() => {
+    localStorage.setItem("db_is_admin", isAdmin ? "true" : "false");
+  }, [isAdmin]);
   const [activePage, setActivePage] = useState<ActivePage>("dashboard");
 
   // Admin Account & Login States
@@ -422,6 +431,7 @@ export default function App() {
     { id: "list-mapel", label: "List Mapel Diajar", icon: BookOpen, adminOnly: false },
     { id: "jam-kosong-individu", label: "Jam Kosong Indiv", icon: Clock, adminOnly: false },
     { id: "jam-kosong-semua", label: "Jam Kosong Semua", icon: Users, adminOnly: true },
+    { id: "rekap-guru", label: "Rekap Guru (Admin)", icon: ClipboardList, adminOnly: true },
     { id: "input-pengganti", label: "Input Inval (Admin)", icon: UserPlus, adminOnly: true },
     { id: "log-pengganti", label: "Log Izin & WA", icon: History, adminOnly: true },
     { id: "statistik", label: "Statistik", icon: BarChart2, adminOnly: true },
@@ -799,6 +809,20 @@ export default function App() {
                   teachers={teachers}
                   schedules={schedules}
                   onBack={() => setActivePage("dashboard")}
+                />
+              ) : (
+                <AdminOnlyFallback onBack={() => setActivePage("dashboard")} />
+              )
+            )}
+
+            {activePage === "rekap-guru" && (
+              isAdmin ? (
+                <RekapGuru 
+                  teachers={teachers}
+                  schedules={schedules}
+                  onBack={() => setActivePage("dashboard")}
+                  setSelectedTeacher={setSelectedTeacher}
+                  setActivePage={setActivePage}
                 />
               ) : (
                 <AdminOnlyFallback onBack={() => setActivePage("dashboard")} />

@@ -56,7 +56,8 @@ export type ActivePage =
   | "jam-kosong-semua"
   | "input-pengganti"
   | "log-pengganti"
-  | "statistik";
+  | "statistik"
+  | "rekap-guru";
 
 export interface DBState {
   teachers: Teacher[];
