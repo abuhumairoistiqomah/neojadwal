@@ -695,6 +695,27 @@ export default function App() {
           {/* Header Right Content */}
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             
+            {/* Database Refresh Button */}
+            {apiUrl && (
+              <button
+                id="header-refresh-db-btn"
+                onClick={async () => {
+                  const success = await fetchFromAppsScript(apiUrl);
+                  if (success) {
+                    alert("Database berhasil disinkronkan dan diperbarui dari Google Sheets!");
+                  } else {
+                    alert("Gagal menyegarkan database. Silakan periksa koneksi Anda.");
+                  }
+                }}
+                disabled={isLoadingApi}
+                className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-blue-50 hover:bg-blue-100 disabled:bg-slate-50 text-blue-700 disabled:text-slate-400 border border-blue-200 disabled:border-slate-200 shadow-xs transition-all cursor-pointer"
+                title="Segarkan Data dari Google Sheets"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isLoadingApi ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline">Refresh Data</span>
+              </button>
+            )}
+
             {/* Apps Script Sync Status indicator */}
             {isAdmin && (
               <button
