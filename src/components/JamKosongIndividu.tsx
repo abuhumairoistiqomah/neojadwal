@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, normalizeDay } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isSameDay } from "../types";
 import { ArrowLeft, Clock, Calendar, CheckCircle, Search, HelpCircle } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -33,44 +33,92 @@ export const JamKosongIndividu: React.FC<JamKosongIndividuProps> = ({
 
   // Compute free slots
   const freeSlots = useMemo(() => {
-    if (!selectedTeacher) return [];
+    if (!selectedTeacher || !currentTeacher) return [];
 
-    const teacherSchedules = schedules.filter(s => 
-      [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
-        g => g && g.trim().toLowerCase() === selectedTeacher.trim().toLowerCase()
-      )
-    );
-    const busySlots = new Set<string>(); // set of "HARI_JAM" e.g., "Senin_1"
-
-    teacherSchedules.forEach(item => {
-      busySlots.add(`${normalizeDay(item.hari)}_${item.jam_ke}`);
-    });
+    const isITBA = checkIsITBA(currentTeacher);
 
     const slots: Array<{
       id: string;
       hari: typeof HARI_LIST[number];
       jam_ke: number;
       waktu: string;
+      isExtraTask: boolean;
+      extraTaskLabel: string;
     }> = [];
 
     HARI_LIST.forEach(hari => {
       JAM_LIST.forEach(jam => {
-        const key = `${hari}_${jam}`;
-        if (!busySlots.has(key)) {
-          const scheduleAtJam = schedules.find(s => s.jam_ke === jam && s.mulai && s.selesai);
-          const waktu = scheduleAtJam ? `${scheduleAtJam.mulai} - ${scheduleAtJam.selesai}` : JAM_TIME_MAP[jam];
+        // Find if they are scheduled in this slot
+        const scheduledSlots = schedules.filter(s => 
+          isSameDay(s.hari, hari) && 
+          s.jam_ke === jam &&
+          [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+            g => g && g.trim().toLowerCase() === selectedTeacher.trim().toLowerCase()
+          )
+        );
+
+        const scheduleAtJamForTime = schedules.find(s => isSameDay(s.hari, hari) && s.jam_ke === jam && s.mulai && s.selesai);
+        const waktu = scheduleAtJamForTime ? `${scheduleAtJamForTime.mulai} - ${scheduleAtJamForTime.selesai}` : JAM_TIME_MAP[jam];
+
+        if (scheduledSlots.length === 0) {
           slots.push({
             id: `free-${hari}-${jam}`,
             hari,
             jam_ke: jam,
             waktu,
+            isExtraTask: false,
+            extraTaskLabel: ""
           });
+        } else if (isITBA) {
+          // Check if any of these scheduled slots are core/mandatory
+          const hasCore = scheduledSlots.some(s => {
+            const sName = (s.mapel || "").toLowerCase();
+            const isCoreQurany = 
+              sName.includes("qur'an") || 
+              sName.includes("quran") || 
+              sName.includes("tahsin") || 
+              sName.includes("tajwid") ||
+              sName.includes("tahfidz") ||
+              sName.includes("tahfizh") ||
+              sName.includes("tahfid") ||
+              sName.includes("tilawah") ||
+              sName.includes("murottal");
+
+            const isKholidOrHariyadiq = 
+              selectedTeacher.toUpperCase().includes("KHOLID") || 
+              selectedTeacher.toUpperCase().includes("HARIYADIQ") ||
+              selectedTeacher.toUpperCase().includes("HARIYADI");
+
+            const isPE = 
+              sName.includes("pe") || 
+              sName.includes("pjok") || 
+              sName.includes("penjas") || 
+              sName.includes("olahraga") ||
+              sName.includes("physical");
+
+            const isCorePE = isKholidOrHariyadiq && isPE;
+
+            return isCoreQurany || isCorePE;
+          });
+
+          if (!hasCore) {
+            // It's a non-core task, so this ITBA teacher is free but doing an extra task (pendamping)
+            const tasks = scheduledSlots.map(s => `${s.mapel} (Kelas ${s.kelas})`).join(", ");
+            slots.push({
+              id: `free-${hari}-${jam}`,
+              hari,
+              jam_ke: jam,
+              waktu,
+              isExtraTask: true,
+              extraTaskLabel: `Sedang Mendampingi: ${tasks}`
+            });
+          }
         }
       });
     });
 
     return slots;
-  }, [selectedTeacher, schedules]);
+  }, [selectedTeacher, currentTeacher, schedules]);
 
   // Filter free slots by day
   const filteredFreeSlots = useMemo(() => {
@@ -212,24 +260,45 @@ export const JamKosongIndividu: React.FC<JamKosongIndividuProps> = ({
                 {filteredFreeSlots.map((slot) => (
                   <div 
                     key={slot.id}
-                    className="p-4 bg-white border border-gray-100 hover:border-amber-200 rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-between gap-3 group"
+                    className={`p-4 bg-white border rounded-xl shadow-sm hover:shadow transition-all flex flex-col justify-between gap-3 group ${
+                      slot.isExtraTask 
+                        ? "border-purple-200 hover:border-purple-300 bg-purple-50/20" 
+                        : "border-gray-100 hover:border-amber-200"
+                    }`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                        <span className="font-bold text-gray-800 text-sm">{slot.hari}</span>
+                    <div className="flex items-center justify-between gap-3 w-full">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Calendar className={`w-3.5 h-3.5 ${slot.isExtraTask ? "text-purple-500" : "text-indigo-500"}`} />
+                          <span className="font-bold text-gray-800 text-sm">{slot.hari}</span>
+                          {slot.isExtraTask && (
+                            <span className="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                              ITBA Tugas Tambahan
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <span>Sesi Jam ke-{slot.jam_ke}</span>
+                        </div>
+                        <div className={`text-xs font-semibold ${slot.isExtraTask ? "text-purple-600" : "text-amber-600"}`}>
+                          {slot.waktu}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <span>Sesi Jam ke-{slot.jam_ke}</span>
-                      </div>
-                      <div className="text-xs font-semibold text-amber-600">
-                        {slot.waktu}
+                      
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
+                        slot.isExtraTask
+                          ? "bg-purple-100 text-purple-700 group-hover:bg-purple-500 group-hover:text-white"
+                          : "bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white"
+                      }`}>
+                        {slot.jam_ke}
                       </div>
                     </div>
-                    
-                    <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs group-hover:bg-amber-500 group-hover:text-white transition-all">
-                      {slot.jam_ke}
-                    </div>
+
+                    {slot.isExtraTask && (
+                      <div className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 rounded-lg p-2 leading-relaxed w-full">
+                        📌 {slot.extraTaskLabel}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

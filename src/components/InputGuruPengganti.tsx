@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, LogIzinItem } from "../types";
+import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, isSameDay } from "../types";
 import { 
   ArrowLeft, Calendar, UserCheck, HelpCircle, Save, 
   Trash2, Plus, Sparkles, CheckSquare, AlertTriangle, AlertCircle 
@@ -34,6 +34,24 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
     return today.toISOString().split("T")[0];
   });
   const [guruIzin, setGuruIzin] = useState<string>("");
+  const [searchTeacherQuery, setSearchTeacherQuery] = useState<string>("");
+  const [showTeacherSuggestions, setShowTeacherSuggestions] = useState<boolean>(false);
+  
+  // Filtered teachers for search-as-you-type suggestions
+  const filteredTeacherSuggestions = useMemo(() => {
+    const query = searchTeacherQuery.trim().toLowerCase();
+    if (!query) {
+      return teachers;
+    }
+    return teachers.filter(t => {
+      const nama = (t.nama || "").toLowerCase();
+      const mapel = (t.mapel_utama || "").toLowerCase();
+      const tugas = (t.tugas_tambahan || "").toLowerCase();
+      const ket = (t.keterangan || "").toLowerCase();
+      return nama.includes(query) || mapel.includes(query) || tugas.includes(query) || ket.includes(query);
+    });
+  }, [teachers, searchTeacherQuery]);
+
   const [alasan, setAlasan] = useState<string>("");
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
   const [generatedRows, setGeneratedRows] = useState<Array<{
@@ -87,7 +105,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
     // Find what this guru teaches at these hours
     const teacherSchedules = schedules.filter(
-      s => s.hari === selectedDayName && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+      s => isSameDay(s.hari, selectedDayName) && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
         g => g && g.trim().toLowerCase() === guruIzin.trim().toLowerCase()
       )
     );
@@ -121,11 +139,51 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       const reasons: string[] = [];
 
       // a. SYARAT MUTLAK: Guru harus sedang JAM KOSONG pada hari dan jam tersebut.
-      const isBusy = schedules.some(
-        s => s.hari === selectedDayName && s.jam_ke === jam_ke && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+      // Catatan Khusus ITBA: Guru ITBA hanya sibuk jika mengajar tugas wajib mereka (Al-Qur'an, Tahsin, Tajwid).
+      // Khusus Kholid dan Hariyadiq juga sibuk jika mengajar PE. Di luar itu (misal mendampingi Bahasa Inggris), mereka dianggap kosong/bisa digantikan.
+      const isITBA = checkIsITBA(candidate);
+      
+      const isBusy = schedules.some(s => {
+        if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
+        
+        const isScheduled = [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
           g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
-        )
-      );
+        );
+        if (!isScheduled) return false;
+
+        if (isITBA) {
+          const sName = (s.mapel || "").toLowerCase();
+          const isCoreQurany = 
+            sName.includes("qur'an") || 
+            sName.includes("quran") || 
+            sName.includes("tahsin") || 
+            sName.includes("tajwid") ||
+            sName.includes("tahfidz") ||
+            sName.includes("tahfizh") ||
+            sName.includes("tahfid") ||
+            sName.includes("tilawah") ||
+            sName.includes("murottal");
+
+          const isKholidOrHariyadiq = 
+            candidate.nama.toUpperCase().includes("KHOLID") || 
+            candidate.nama.toUpperCase().includes("HARIYADIQ") ||
+            candidate.nama.toUpperCase().includes("HARIYADI");
+
+          const isPE = 
+            sName.includes("pe") || 
+            sName.includes("pjok") || 
+            sName.includes("penjas") || 
+            sName.includes("olahraga") ||
+            sName.includes("physical");
+
+          const isCorePE = isKholidOrHariyadiq && isPE;
+
+          return isCoreQurany || isCorePE;
+        }
+
+        return true;
+      });
+
       if (isBusy) {
         return { teacher: candidate, eligible: false, score: -999, reasons: ["Sedang mengajar kelas reguler"] };
       }
@@ -171,8 +229,25 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
       // g. Prioritas 5: Manajemen (Turunkan ke prioritas paling bawah).
       if (candidate.is_manajemen) {
-        score -= 50;
-        reasons.push("Tim Manajemen (-50)");
+        score -= 100;
+        reasons.push("Tim Manajemen (-100)");
+      }
+
+      // h. Catatan Tambahan untuk ITBA
+      if (isITBA) {
+        // Check if they are scheduled in this slot for a non-core subject
+        const isAssistingNonCore = schedules.some(
+          s => isSameDay(s.hari, selectedDayName) && s.jam_ke === jam_ke && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+            g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+          )
+        );
+        if (isAssistingNonCore) {
+          score += 15;
+          reasons.push("Mahasiswa ITBA (Mendampingi Kelas Non-Wajib) (+15)");
+        } else {
+          score += 5;
+          reasons.push("Mahasiswa ITBA (Jam Kosong Murni) (+5)");
+        }
       }
 
       return {
@@ -233,6 +308,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
     // Reset Form
     setSuccessMessage(`Berhasil menambahkan ${newLogs.length} Log Guru Pengganti!`);
     setGuruIzin("");
+    setSearchTeacherQuery("");
+    setShowTeacherSuggestions(false);
     setAlasan("");
     setSelectedHours([]);
     setGeneratedRows([]);
@@ -315,26 +392,105 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
             </div>
 
             {/* Field B: Guru yang Izin */}
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <label className="block text-sm font-bold text-gray-700 flex items-center gap-1.5">
                 <UserCheck className="w-4 h-4 text-gray-400" />
                 Guru yang Izin
               </label>
-              <select
-                id="select-guru-izin"
-                value={guruIzin}
-                onChange={(e) => {
-                  setGuruIzin(e.target.value);
-                  setGeneratedRows([]); // reset generated rows
-                }}
-                className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white text-gray-800 border border-gray-200 focus:border-indigo-500 rounded-xl p-3 focus:outline-none transition-all text-sm font-semibold"
-                required
-              >
-                <option value="">-- Pilih Guru Izin --</option>
-                {teachers.map(t => (
-                  <option key={t.nama} value={t.nama}>{t.nama} ({t.mapel_utama})</option>
-                ))}
-              </select>
+              
+              <div className="relative">
+                <input
+                  id="input-guru-izin-search"
+                  type="text"
+                  placeholder="Ketik nama guru atau mata pelajaran..."
+                  value={searchTeacherQuery}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchTeacherQuery(val);
+                    setShowTeacherSuggestions(true);
+                    
+                    // If the user types, check if they matched exactly
+                    const match = teachers.find(t => t.nama.toLowerCase() === val.trim().toLowerCase());
+                    if (match) {
+                      setGuruIzin(match.nama);
+                    } else {
+                      setGuruIzin(""); // Clear active selected teacher until explicit click
+                    }
+                    setGeneratedRows([]); // reset generated rows
+                  }}
+                  onFocus={() => {
+                    setShowTeacherSuggestions(true);
+                  }}
+                  className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white text-gray-800 border border-gray-200 focus:border-indigo-500 rounded-xl p-3 pr-20 focus:outline-none transition-all text-sm font-semibold"
+                  required
+                  autoComplete="off"
+                />
+
+                {/* Status indicator badge inside the textbox */}
+                {guruIzin && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
+                    Terpilih
+                  </span>
+                )}
+              </div>
+
+              {/* Backdrop to close the suggestion dropdown when clicked outside */}
+              {showTeacherSuggestions && (
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setShowTeacherSuggestions(false)} 
+                />
+              )}
+
+              {/* Suggestions List Container */}
+              {showTeacherSuggestions && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-gray-100 rounded-xl shadow-lg max-h-60 overflow-y-auto z-20 divide-y divide-gray-50">
+                  {filteredTeacherSuggestions.length > 0 ? (
+                    filteredTeacherSuggestions.map((t) => {
+                      const isSelected = guruIzin === t.nama;
+                      const isITBA = checkIsITBA(t);
+                      return (
+                        <div
+                          key={t.nama}
+                          onClick={() => {
+                            setGuruIzin(t.nama);
+                            setSearchTeacherQuery(t.nama);
+                            setShowTeacherSuggestions(false);
+                            setGeneratedRows([]);
+                          }}
+                          className={`p-3 text-sm cursor-pointer transition-all flex items-center justify-between ${
+                            isSelected 
+                              ? "bg-indigo-50/70 text-indigo-900 font-bold" 
+                              : "hover:bg-gray-50 text-gray-700"
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-800 flex items-center gap-1.5">
+                              {t.nama}
+                              {isITBA && (
+                                <span className="text-[9px] bg-purple-100 text-purple-700 border border-purple-200 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider scale-95">
+                                  ITBA
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-xs text-gray-400 mt-0.5 font-normal">
+                              Mapel Utama: {t.mapel_utama || "-"}
+                              {t.tugas_tambahan && ` • ${t.tugas_tambahan}`}
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <span className="text-indigo-600 font-bold text-xs">✓</span>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-center text-xs text-gray-400 font-medium">
+                      Tidak ada guru yang cocok dengan pencarian Anda
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Field C: Alasan */}
@@ -374,7 +530,9 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                 {[1, 2, 3, 4, 5, 6].map((hour) => {
                   // Count sessions taught by selected teacher to guide user
                   const hasClassAtHour = schedules.some(
-                    s => s.nama_guru === guruIzin && s.hari === selectedDayName && s.jam_ke === hour
+                    s => isSameDay(s.hari, selectedDayName) && s.jam_ke === hour && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+                      g => g && g.trim().toLowerCase() === guruIzin.trim().toLowerCase()
+                    )
                   );
 
                   return (
@@ -399,11 +557,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                           }}
                         />
                       </div>
-                      <span className="text-[10px] text-gray-400 mt-2 font-medium block">
-                        {JAM_TIME_MAP[hour]}
-                      </span>
                       {guruIzin && (
-                        <span className={`text-[9px] mt-1 font-bold ${hasClassAtHour ? "text-indigo-600" : "text-gray-300 italic"}`}>
+                        <span className={`text-[9px] mt-1.5 font-bold ${hasClassAtHour ? "text-indigo-600" : "text-gray-300 italic"}`}>
                           {hasClassAtHour ? "✓ Mengajar" : "× Free"}
                         </span>
                       )}

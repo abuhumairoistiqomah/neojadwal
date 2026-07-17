@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, normalizeDay } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA } from "../types";
 import { ArrowLeft, BookOpen, ChevronUp, ChevronDown, UserCheck, Search, HelpCircle } from "lucide-react";
 
 interface ListMapelProps {
@@ -18,7 +18,7 @@ interface GroupedMapelItem {
   jp: number;
   waktu: string;
   isWaliAtauPendamping: boolean;
-  roleType: "Wali Kelas" | "Pendamping" | null;
+  roleType: "Wali Kelas" | "Pendamping" | "Pendamping Guru Mapel" | null;
 }
 
 type SortKey = "mapel" | "hari" | "kelas" | "jp";
@@ -92,7 +92,7 @@ export const ListMapel: React.FC<ListMapelProps> = ({
       const displayTimes = uniqueTimes.join(", ");
 
       let isWaliAtauPendamping = false;
-      let roleType: "Wali Kelas" | "Pendamping" | null = null;
+      let roleType: "Wali Kelas" | "Pendamping" | "Pendamping Guru Mapel" | null = null;
 
       if (currentTeacher.wali_kelas === kelas) {
         isWaliAtauPendamping = true;
@@ -100,6 +100,39 @@ export const ListMapel: React.FC<ListMapelProps> = ({
       } else if (currentTeacher.pendamping_kelas === kelas) {
         isWaliAtauPendamping = true;
         roleType = "Pendamping";
+      } else {
+        const isITBA = checkIsITBA(currentTeacher);
+        if (isITBA) {
+          const sName = (sample.mapel || "").toLowerCase();
+          const isCoreQurany = 
+            sName.includes("qur'an") || 
+            sName.includes("quran") || 
+            sName.includes("tahsin") || 
+            sName.includes("tajwid") ||
+            sName.includes("tahfidz") ||
+            sName.includes("tahfizh") ||
+            sName.includes("tahfid") ||
+            sName.includes("tilawah") ||
+            sName.includes("murottal");
+
+          const isKholidOrHariyadiq = 
+            currentTeacher.nama.toUpperCase().includes("KHOLID") || 
+            currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
+            currentTeacher.nama.toUpperCase().includes("HARIYADI");
+
+          const isPE = 
+            sName.includes("pe") || 
+            sName.includes("pjok") || 
+            sName.includes("penjas") || 
+            sName.includes("olahraga") ||
+            sName.includes("physical");
+
+          const isCorePE = isKholidOrHariyadiq && isPE;
+
+          if (!(isCoreQurany || isCorePE)) {
+            roleType = "Pendamping Guru Mapel";
+          }
+        }
       }
 
       return {
@@ -256,9 +289,15 @@ export const ListMapel: React.FC<ListMapelProps> = ({
               </div>
             </div>
 
-            <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 p-3 rounded-xl flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Baris berlatar <strong>hijau muda</strong> menandakan guru yang bersangkutan bertugas sebagai Wali Kelas / Pendamping di kelas tersebut.</span>
+            <div className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-100 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 divide-y sm:divide-y-0 sm:divide-x divide-emerald-200/50">
+              <div className="flex items-center gap-2 pb-2 sm:pb-0">
+                <HelpCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Baris berlatar <strong className="text-emerald-950">hijau muda</strong> menandakan guru bertugas sebagai Wali Kelas / Pendamping Kelas.</span>
+              </div>
+              <div className="flex items-center gap-2 pt-2 sm:pt-0 sm:pl-4">
+                <span className="w-2.5 h-2.5 rounded bg-purple-500 shrink-0" />
+                <span>Baris berlatar <strong className="text-purple-950">ungu muda</strong> menandakan guru mahasiswa ITBA bertugas sebagai Pendamping Guru Mapel.</span>
+              </div>
             </div>
 
             {/* DESKTOP TABLE */}
@@ -304,9 +343,11 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                       <tr 
                         key={item.id}
                         className={`transition-colors ${
-                          item.isWaliAtauPendamping 
-                            ? "bg-emerald-50/70 hover:bg-emerald-100/60" 
-                            : "hover:bg-gray-50/50"
+                          item.roleType === "Pendamping Guru Mapel"
+                            ? "bg-purple-50/70 hover:bg-purple-100/60"
+                            : item.isWaliAtauPendamping 
+                              ? "bg-emerald-50/70 hover:bg-emerald-100/60" 
+                              : "hover:bg-gray-50/50"
                         }`}
                       >
                         <td className="p-4 font-bold text-gray-800">{item.mapel}</td>
@@ -316,7 +357,11 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                         <td className="p-4 text-gray-500 font-medium">{item.waktu}</td>
                         <td className="p-4">
                           {item.roleType ? (
-                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded-md uppercase">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase ${
+                              item.roleType === "Pendamping Guru Mapel"
+                                ? "bg-purple-100 text-purple-800 border border-purple-200"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}>
                               {item.roleType}
                             </span>
                           ) : (
@@ -343,9 +388,11 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                   <div 
                     key={item.id}
                     className={`p-4 rounded-xl border transition-all ${
-                      item.isWaliAtauPendamping 
-                        ? "bg-emerald-50/80 border-emerald-100" 
-                        : "bg-white border-gray-100"
+                      item.roleType === "Pendamping Guru Mapel"
+                        ? "bg-purple-50/80 border-purple-100"
+                        : item.isWaliAtauPendamping 
+                          ? "bg-emerald-50/80 border-emerald-100" 
+                          : "bg-white border-gray-100"
                     }`}
                   >
                     <div className="flex justify-between items-start gap-2">
@@ -364,7 +411,11 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                       </span>
 
                       {item.roleType && (
-                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded uppercase">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                          item.roleType === "Pendamping Guru Mapel"
+                            ? "bg-purple-100 text-purple-800 border border-purple-200"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}>
                           {item.roleType}
                         </span>
                       )}

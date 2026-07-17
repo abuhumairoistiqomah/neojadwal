@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, normalizeDay } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, isSameDay } from "../types";
 import { ArrowLeft, AlertCircle, Search, Users, Download, Loader2, Printer } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -1294,7 +1294,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
 
                         // Ensure teacher doesn't have teaching duties (as guru1-guru6) in other slots at the same day and period
                         const isTeachingAtSameTime = schedules.some(s => {
-                          const sameDay = (s.hari || "").trim().toLowerCase() === (editingItem.hari || "").trim().toLowerCase();
+                          const sameDay = isSameDay(s.hari, editingItem.hari);
                           const samePeriod = Number(s.jam_ke) === Number(editingItem.jam_ke);
                           if (!sameDay || !samePeriod) return false;
 

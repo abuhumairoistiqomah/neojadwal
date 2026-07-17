@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, isSameDay } from "../types";
+import { Teacher, ScheduleItem, isSameDay, checkIsITBA } from "../types";
 import { ArrowLeft, Users, Clock, Calendar, CheckSquare, Search, AlertCircle, ShieldAlert } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -23,30 +23,86 @@ export const JamKosongSemua: React.FC<JamKosongSemuaProps> = ({
 
   // Compute which teachers are free at selectedDay and selectedJam
   const freeTeachers = useMemo(() => {
-    // 1. Find all teachers who HAVE a schedule at this specific day/jam
-    const busyTeacherNames = new Set<string>();
-    schedules.forEach(item => {
-      if (isSameDay(item.hari, selectedDay) && item.jam_ke === selectedJam) {
-        [item.guru1, item.guru2, item.guru3, item.guru4, item.guru5, item.guru6].forEach(g => {
-          if (g && g.trim()) {
-            busyTeacherNames.add(g.trim().toLowerCase());
-          }
+    const list: Array<{
+      teacher: Teacher;
+      isExtraTask: boolean;
+      extraTaskLabel: string;
+    }> = [];
+
+    teachers.forEach(teacher => {
+      const scheduledSlots = schedules.filter(item => 
+        isSameDay(item.hari, selectedDay) && 
+        item.jam_ke === selectedJam &&
+        [item.guru1, item.guru2, item.guru3, item.guru4, item.guru5, item.guru6].some(
+          g => g && g.trim().toLowerCase() === teacher.nama.trim().toLowerCase()
+        )
+      );
+
+      if (scheduledSlots.length === 0) {
+        list.push({
+          teacher,
+          isExtraTask: false,
+          extraTaskLabel: ""
         });
+      } else {
+        const isITBA = checkIsITBA(teacher);
+        if (isITBA) {
+          // Check if any of these scheduled slots are core/mandatory
+          const hasCore = scheduledSlots.some(s => {
+            const sName = (s.mapel || "").toLowerCase();
+            const isCoreQurany = 
+              sName.includes("qur'an") || 
+              sName.includes("quran") || 
+              sName.includes("tahsin") || 
+              sName.includes("tajwid") ||
+              sName.includes("tahfidz") ||
+              sName.includes("tahfizh") ||
+              sName.includes("tahfid") ||
+              sName.includes("tilawah") ||
+              sName.includes("murottal");
+
+            const isKholidOrHariyadiq = 
+              teacher.nama.toUpperCase().includes("KHOLID") || 
+              teacher.nama.toUpperCase().includes("HARIYADIQ") ||
+              teacher.nama.toUpperCase().includes("HARIYADI");
+
+            const isPE = 
+              sName.includes("pe") || 
+              sName.includes("pjok") || 
+              sName.includes("penjas") || 
+              sName.includes("olahraga") ||
+              sName.includes("physical");
+
+            const isCorePE = isKholidOrHariyadiq && isPE;
+
+            return isCoreQurany || isCorePE;
+          });
+
+          if (!hasCore) {
+            // It's a non-core task, so this ITBA teacher is free but doing an extra task (pendamping)
+            const tasks = scheduledSlots.map(s => `${s.mapel} (Kelas ${s.kelas})`).join(", ");
+            list.push({
+              teacher,
+              isExtraTask: true,
+              extraTaskLabel: `Sedang Mendampingi: ${tasks}`
+            });
+          }
+        }
       }
     });
 
-    // 2. Filter teachers that are NOT in the busy set
-    return teachers.filter(t => !busyTeacherNames.has(t.nama.trim().toLowerCase()));
+    return list;
   }, [teachers, schedules, selectedDay, selectedJam]);
 
   // Apply search query filter
   const filteredFreeTeachers = useMemo(() => {
     if (searchQuery.trim() === "") return freeTeachers;
     const query = searchQuery.toLowerCase();
-    return freeTeachers.filter(t => 
-      t.nama.toLowerCase().includes(query) || 
-      t.mapel_utama.toLowerCase().includes(query) ||
-      t.rumpun.toLowerCase().includes(query)
+    return freeTeachers.filter(item => 
+      item.teacher.nama.toLowerCase().includes(query) || 
+      item.teacher.mapel_utama.toLowerCase().includes(query) ||
+      item.teacher.rumpun.toLowerCase().includes(query) ||
+      item.extraTaskLabel.toLowerCase().includes(query)
     );
   }, [freeTeachers, searchQuery]);
 
@@ -155,51 +211,65 @@ export const JamKosongSemua: React.FC<JamKosongSemuaProps> = ({
         {/* Free Teachers Cards List */}
         {filteredFreeTeachers.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-            {filteredFreeTeachers.map((teacher) => (
-              <div 
-                key={teacher.nama}
-                className="bg-white border border-gray-100 hover:border-indigo-100 p-5 rounded-2xl shadow-sm hover:shadow transition-all flex flex-col justify-between space-y-4"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                      {teacher.nama[0]}
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-1 text-[10px] font-bold">
-                      <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full uppercase border border-emerald-100">
-                        {teacher.jenjang}
-                      </span>
-                      {teacher.is_manajemen && (
-                        <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full uppercase border border-amber-100">
-                          Manajemen
+            {filteredFreeTeachers.map((item) => {
+              const { teacher, isExtraTask, extraTaskLabel } = item;
+              return (
+                <div 
+                  key={teacher.nama}
+                  className="bg-white border border-gray-100 hover:border-indigo-100 p-5 rounded-2xl shadow-sm hover:shadow transition-all flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                        {teacher.nama[0]}
+                      </div>
+                      
+                      <div className="flex flex-col items-end gap-1 text-[10px] font-bold">
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full uppercase border border-emerald-100">
+                          {teacher.jenjang}
                         </span>
-                      )}
+                        {teacher.is_manajemen && (
+                          <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full uppercase border border-amber-100">
+                            Manajemen
+                          </span>
+                        )}
+                        {isExtraTask && (
+                          <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full uppercase border border-purple-100 animate-pulse">
+                            ITBA (Tugas Tambahan)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-gray-800 text-sm leading-snug">{teacher.nama}</h4>
+                      <p className="text-xs text-gray-400 font-medium mt-0.5">Mapel Utama: {teacher.mapel_utama}</p>
+                    </div>
+
+                    {isExtraTask && (
+                      <div className="text-[11px] font-semibold text-purple-700 bg-purple-50/70 border border-purple-100/50 rounded-lg p-2 mt-2 leading-relaxed">
+                        📌 {extraTaskLabel}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-50 space-y-1.5 text-[11px] text-gray-500">
+                    <div className="flex justify-between">
+                      <span>Rumpun:</span>
+                      <strong className="text-gray-700">{teacher.rumpun}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Wali Kelas:</span>
+                      <strong className="text-gray-700">{teacher.wali_kelas || "Bukan"}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Pendamping:</span>
+                      <strong className="text-gray-700">{teacher.pendamping_kelas || "Tidak ada"}</strong>
                     </div>
                   </div>
-
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-sm leading-snug">{teacher.nama}</h4>
-                    <p className="text-xs text-gray-400 font-medium mt-0.5">Mapel Utama: {teacher.mapel_utama}</p>
-                  </div>
                 </div>
-
-                <div className="pt-3 border-t border-gray-50 space-y-1.5 text-[11px] text-gray-500">
-                  <div className="flex justify-between">
-                    <span>Rumpun:</span>
-                    <strong className="text-gray-700">{teacher.rumpun}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Wali Kelas:</span>
-                    <strong className="text-gray-700">{teacher.wali_kelas || "Bukan"}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Pendamping:</span>
-                    <strong className="text-gray-700">{teacher.pendamping_kelas || "Tidak ada"}</strong>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="py-12 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl mt-6">

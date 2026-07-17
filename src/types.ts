@@ -82,4 +82,18 @@ export function isSameDay(dayA: string, dayB: string): boolean {
   return normalizeDay(dayA) === normalizeDay(dayB);
 }
 
+export function checkIsITBA(teacher: Teacher | undefined): boolean {
+  if (!teacher) return false;
+  const name = (teacher.nama || "").toUpperCase();
+  const tugas = (teacher.tugas_tambahan || "").toUpperCase();
+  const ket = (teacher.keterangan || "").toUpperCase();
+  const mapel = (teacher.mapel_utama || "").toUpperCase();
+  return (
+    name.includes("ITBA") || 
+    tugas.includes("ITBA") || 
+    ket.includes("ITBA") ||
+    mapel.includes("ITBA")
+  );
+}
+
 
