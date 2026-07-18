@@ -809,7 +809,18 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
 
               {/* DESKTOP 2D GRID TABLE WITH DYNAMIC CHRONOLOGICAL COLUMNS */}
               <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
-                <table className="w-full border-collapse text-left">
+                <table className="w-full border-collapse text-left table-fixed min-w-[1050px]">
+                  <colgroup>
+                    <col className="w-28" />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                    <col />
+                  </colgroup>
                   <thead>
                     <tr className="bg-slate-100 border-b border-slate-200">
                       <th className="p-4 text-xs font-extrabold text-slate-400 uppercase tracking-wider text-center w-28 border-r border-slate-200">

@@ -191,7 +191,16 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
 
             {/* DESKTOP 2D GRID TABLE */}
             <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full border-collapse text-left">
+              <table className="w-full border-collapse text-left table-fixed min-w-[950px]">
+                <colgroup>
+                  <col className="w-28" />
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                </colgroup>
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-center w-28 border-r border-slate-200">
