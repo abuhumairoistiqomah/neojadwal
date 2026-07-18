@@ -63,7 +63,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       day: "numeric"
     });
 
-    let waText = `*Info Inval [${dateFormatted}]*\n`;
+    let waText = `*Hal: Guru Pengganti*\n\nBismillah. Berikut nama - nama guru pengganti hari *${dateFormatted}*.\n\n`;
     
     // Group items by Teacher Izin first so they appear neatly
     const teacherMap: Record<string, LogIzinItem[]> = {};
@@ -74,19 +74,20 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       teacherMap[item.guru_izin].push(item);
     });
 
-    let counter = 1;
+    const teacherSections: string[] = [];
+
     Object.entries(teacherMap).forEach(([guruIzin, logsList]) => {
-      // e.g. "1. Drs. Ahmad Sudrajat, M.Pd. izin:\n   - Jam 1-2 digantikan Hendrawan di XII-IPA-1 (Fisika)"
       const alasan = logsList[0].alasan;
-      waText += `${counter}. *${guruIzin}* izin (${alasan}):\n`;
+      let section = `*${guruIzin}* - ${alasan}\n`;
       
-      logsList.forEach(log => {
-        waText += `   • Jam ke-${log.jam_ke} (${JAM_TIME_MAP[log.jam_ke]}), digantikan *${log.guru_pengganti}* di kelas *${log.kelas}* [Mapel: ${log.mapel}]\n`;
+      logsList.forEach((log, index) => {
+        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*\n`;
       });
-      counter++;
+      
+      teacherSections.push(section.trimEnd());
     });
 
-    waText += `\n_Dimohon Bapak/Ibu guru pengganti dapat memasuki kelas tepat waktu. Terima kasih._`;
+    waText += teacherSections.join("\n\n");
 
     // Copy to clipboard
     navigator.clipboard.writeText(waText).then(() => {
