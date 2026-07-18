@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Teacher, ScheduleItem, normalizeDay, isSameDay } from "../types";
-import { ArrowLeft, AlertCircle, Search, Users, Download, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, AlertCircle, Search, Users, Download, Loader2, Printer, X, Clock, User, Calendar, GraduationCap } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
 interface JadwalKelasProps {
@@ -191,6 +191,14 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
   // Companion edit state
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [editingError, setEditingError] = useState<string | null>(null);
+
+  // Detail Pop-up state
+  const [selectedDetail, setSelectedDetail] = useState<{
+    hari: string;
+    jam: number;
+    waktu: string;
+    items: ScheduleItem[];
+  } | null>(null);
 
   // Compute total weekly JP for each teacher from schedules (detecting combined classes: count same day + period as 1 JP)
   const teacherJpMap = useMemo(() => {
@@ -871,13 +879,14 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                               return (
                                 <td 
                                   key={`cell-${idx}`} 
-                                  onClick={() => isAdmin && setEditingItem(items[0])}
-                                  className={`p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle ${
-                                    isAdmin 
-                                      ? "cursor-pointer hover:bg-blue-100 hover:scale-[1.02] hover:shadow-md active:scale-[0.98]" 
-                                      : ""
-                                  }`}
-                                  title={isAdmin ? "Klik untuk mengedit Team Teaching" : undefined}
+                                  onClick={() => setSelectedDetail({
+                                    hari,
+                                    jam,
+                                    waktu: col.timeRange,
+                                    items,
+                                  })}
+                                  className="p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle cursor-pointer hover:bg-blue-100/80 hover:scale-[1.01] hover:shadow-xs active:scale-[0.98]"
+                                  title="Klik untuk detail pelajaran & pengampu"
                                 >
                                   <div className="font-extrabold text-xs sm:text-sm leading-tight text-slate-800">{displayMapel}</div>
                                   <div className="text-[10px] font-bold mt-1 text-blue-800 line-clamp-2" title={displayGuru}>
@@ -992,13 +1001,14 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                             return (
                               <td 
                                 key={`cell-fri-${idx}`} 
-                                onClick={() => isAdmin && setEditingItem(items[0])}
-                                className={`p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle ${
-                                  isAdmin 
-                                    ? "cursor-pointer hover:bg-blue-100 hover:scale-[1.02] hover:shadow-md active:scale-[0.98]" 
-                                    : ""
-                                }`}
-                                title={isAdmin ? "Klik untuk mengedit Team Teaching" : undefined}
+                                onClick={() => setSelectedDetail({
+                                  hari: "Jumat",
+                                  jam,
+                                  waktu: col.timeRange,
+                                  items,
+                                })}
+                                className="p-3 border-r border-slate-200 text-center bg-blue-50/60 text-blue-900 border-l-2 border-l-blue-400 transition-all align-middle cursor-pointer hover:bg-blue-100/80 hover:scale-[1.01] hover:shadow-xs active:scale-[0.98]"
+                                title="Klik untuk detail pelajaran & pengampu"
                               >
                                 <div className="font-extrabold text-xs sm:text-sm leading-tight text-slate-800">{displayMapel}</div>
                                 <div className="text-[10px] font-bold mt-1 text-blue-800 line-clamp-2" title={displayGuru}>
@@ -1099,13 +1109,14 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                                 return (
                                   <div 
                                     key={`mob-cell-${idx}`}
-                                    onClick={() => isAdmin && setEditingItem(items[0])}
-                                    className={`p-3 rounded-lg border border-blue-100 bg-blue-50/50 text-blue-900 flex items-center justify-between gap-3 ${
-                                      isAdmin 
-                                        ? "cursor-pointer hover:bg-blue-100/80 hover:ring-2 hover:ring-blue-400 transition-all active:scale-[0.98]" 
-                                        : ""
-                                    }`}
-                                    title={isAdmin ? "Klik untuk mengedit Team Teaching" : undefined}
+                                    onClick={() => setSelectedDetail({
+                                      hari,
+                                      jam,
+                                      waktu: col.timeRange,
+                                      items,
+                                    })}
+                                    className="p-3 rounded-lg border border-blue-100 bg-blue-50/50 text-blue-900 flex items-center justify-between gap-3 cursor-pointer hover:bg-blue-100/80 hover:ring-2 hover:ring-blue-400/30 transition-all active:scale-[0.98]"
+                                    title="Klik untuk detail pelajaran & pengampu"
                                   >
                                     <div>
                                       <span className="text-[9px] font-extrabold uppercase bg-white px-1.5 py-0.5 rounded mr-2 border border-blue-100 shadow-3xs text-blue-700">
@@ -1342,6 +1353,192 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Pop-up Modal */}
+      {selectedDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-5 flex justify-between items-start shrink-0">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-blue-600 px-2.5 py-0.5 rounded-full">
+                  Detail Pelajaran
+                </span>
+                <h3 className="text-xl font-black mt-2 leading-tight flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-blue-400" />
+                  Hari {selectedDetail.hari}, Jam ke-{selectedDetail.jam}
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-1 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  Waktu: {selectedDetail.waktu}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedDetail(null)}
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 overflow-y-auto">
+              <div className="space-y-4">
+                {(() => {
+                  interface GroupedScheduleItem {
+                    mapel: string;
+                    kelasNames: string[];
+                    ruangan?: string;
+                    kelasgabung: boolean;
+                    teachers: string[];
+                    originalItem: ScheduleItem;
+                  }
+                  
+                  const groupedItems: GroupedScheduleItem[] = [];
+
+                  selectedDetail.items.forEach(item => {
+                    const itemTeachers = [
+                      item.guru1,
+                      item.guru2,
+                      item.guru3,
+                      item.guru4,
+                      item.guru5,
+                      item.guru6
+                    ].map(g => g?.trim()).filter(Boolean);
+
+                    // Find if we already have a group with the same mapel and teachers
+                    const existingGroup = groupedItems.find(g => {
+                      const isSameMapel = g.mapel.trim().toLowerCase() === item.mapel.trim().toLowerCase();
+                      const isSameTeachers = g.teachers.length === itemTeachers.length &&
+                        g.teachers.every((t, i) => t.toLowerCase() === itemTeachers[i].toLowerCase());
+                      return isSameMapel && isSameTeachers;
+                    });
+
+                    const isItemKelasGabung = item.kelasgabung && (
+                      item.kelasgabung.trim().toLowerCase() === "ya" || 
+                      item.kelasgabung.trim().toLowerCase() === "iya"
+                    );
+
+                    if (existingGroup) {
+                      if (!existingGroup.kelasNames.includes(item.kelas)) {
+                        existingGroup.kelasNames.push(item.kelas);
+                      }
+                      if (isItemKelasGabung) {
+                        existingGroup.kelasgabung = true;
+                      }
+                      if (item.ruangan && !existingGroup.ruangan?.includes(item.ruangan)) {
+                        existingGroup.ruangan = existingGroup.ruangan ? `${existingGroup.ruangan}, ${item.ruangan}` : item.ruangan;
+                      }
+                    } else {
+                      groupedItems.push({
+                        mapel: item.mapel,
+                        kelasNames: [item.kelas],
+                        ruangan: item.ruangan,
+                        kelasgabung: isItemKelasGabung,
+                        teachers: itemTeachers,
+                        originalItem: item
+                      });
+                    }
+                  });
+
+                  return groupedItems.map((group, idx) => {
+                    return (
+                      <div key={idx} className="p-4 bg-slate-50 border border-slate-200/60 rounded-xl space-y-4">
+                        {/* Subject & Class Details */}
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-lg font-bold text-slate-800 flex items-center gap-1.5">
+                              <GraduationCap className="w-5 h-5 text-blue-600 shrink-0" />
+                              {group.mapel}
+                            </h4>
+                            <span className="bg-blue-100 text-blue-800 text-xs font-black px-2.5 py-1 rounded-lg text-right max-w-[200px]">
+                              Kelas {group.kelasNames.join(", ")}
+                            </span>
+                          </div>
+                          {group.ruangan && (
+                            <span className="text-xs text-slate-500 font-medium mt-1 block">
+                              Ruangan: <span className="font-semibold text-slate-700">{group.ruangan}</span>
+                            </span>
+                          )}
+                          {group.kelasgabung && (
+                            <span className="mt-1.5 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider inline-block">
+                              Kelas Gabung
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Teachers Info */}
+                        <div className="space-y-2">
+                          <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5 text-slate-400" />
+                            Guru Pengampu (Team Teaching)
+                          </span>
+
+                          <div className="space-y-2">
+                            {group.teachers.map((teacherName, tIdx) => {
+                              const isMainTeacher = tIdx === 0;
+                              const displayName = getTeacherDisplayName(teacherName);
+                              return (
+                                <div key={tIdx} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-slate-100">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                                      isMainTeacher ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-blue-50 text-blue-600 border border-blue-200"
+                                    }`}>
+                                      {teacherName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <span className="text-xs font-bold text-slate-800 block">
+                                        {teacherName} {displayName && displayName !== teacherName ? `(${displayName})` : ""}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wide">
+                                        {isMainTeacher ? "Guru Utama (Main)" : `Guru Partner ${tIdx}`}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
+                                    {teacherJpMap[teacherName?.trim()] || 0} JP
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {group.teachers.length === 0 && (
+                              <p className="text-xs text-slate-400 italic">Tidak ada guru terdaftar</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex justify-between items-center shrink-0">
+              {isAdmin ? (
+                <button
+                  onClick={() => {
+                    setEditingItem(selectedDetail.items[0]);
+                    setSelectedDetail(null);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Atur Team Teaching
+                </button>
+              ) : (
+                <div />
+              )}
+              <button
+                onClick={() => setSelectedDetail(null)}
+                className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+              >
+                Tutup Detail
               </button>
             </div>
           </div>
