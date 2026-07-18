@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Teacher, ScheduleItem, ActivePage, isSameDay } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
-  History, BarChart2, Shield, User, ChevronRight, X 
+  History, BarChart2, Shield, User, ChevronRight, X, Table 
 } from "lucide-react";
 
 export const JAM_TIME_MAP: Record<number, string> = {
@@ -467,6 +467,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* ADMIN ONLY SECTIONS */}
           {isAdmin ? (
             <>
+              {/* Menu: Tabel Jam Kosong */}
+              <button
+                id="menu-tabel-jam-kosong"
+                onClick={() => setPage("tabel-jam-kosong")}
+                className="group relative bg-blue-50/30 border border-blue-100/70 hover:border-blue-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all text-left flex items-start gap-4"
+              >
+                <div className="p-3 bg-blue-100 text-blue-700 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <Table className="w-6 h-6" />
+                </div>
+                <div className="space-y-1 pr-6 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+                      Tabel Jam Kosong Guru
+                    </h4>
+                    <span className="text-[9px] bg-blue-200 text-blue-800 font-bold px-1.5 py-0.5 rounded-md uppercase">
+                      Admin
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Peta ketersediaan (matrix tabel) ketersediaan jam kosong seluruh guru per hari.
+                  </p>
+                </div>
+                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+              </button>
+
               {/* Menu d: Jam Kosong Semua Guru */}
               <button
                 id="menu-jam-kosong-semua"

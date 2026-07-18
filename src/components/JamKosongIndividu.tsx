@@ -48,6 +48,11 @@ export const JamKosongIndividu: React.FC<JamKosongIndividuProps> = ({
 
     HARI_LIST.forEach(hari => {
       JAM_LIST.forEach(jam => {
+        // Skip Friday Jam 6 completely
+        if (hari === "Jumat" && jam === 6) {
+          return;
+        }
+
         // Find if they are scheduled in this slot
         const scheduledSlots = schedules.filter(s => 
           isSameDay(s.hari, hari) && 
@@ -128,7 +133,7 @@ export const JamKosongIndividu: React.FC<JamKosongIndividuProps> = ({
 
   // Calculate percentage of free time
   const freePercentage = useMemo(() => {
-    const totalSlots = 30;
+    const totalSlots = 29;
     const freeCount = freeSlots.length;
     return Math.round((freeCount / totalSlots) * 100);
   }, [freeSlots]);
@@ -216,7 +221,7 @@ export const JamKosongIndividu: React.FC<JamKosongIndividuProps> = ({
 
               <div className="p-5 bg-amber-50/50 border border-amber-100/50 rounded-2xl flex flex-col items-center justify-center text-center">
                 <span className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Availabilitas</span>
-                <span className="text-3xl font-black text-amber-600">{freeSlots.length} / 30 JP</span>
+                <span className="text-3xl font-black text-amber-600">{freeSlots.length} / 29 JP</span>
                 <span className="text-xs text-amber-700 font-semibold mt-1">({freePercentage}% Jam Kosong)</span>
               </div>
             </div>

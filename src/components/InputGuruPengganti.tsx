@@ -131,8 +131,20 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
     const targetTeacher = teachers.find(t => t.nama === guruIzin);
     if (!targetTeacher) return [];
 
-    // 1. Get all candidate teachers (except the absent one)
-    const candidates = teachers.filter(t => t.nama !== guruIzin);
+    // 1. Get all candidate teachers (except the absent one and native teachers)
+    const nativeTeachersToExclude = [
+      "Syaikh Ali Ali Sinan",
+      "Syeikhoh Muthmainnah",
+      "Syaikh Abdul Manshur"
+    ].map(name => name.trim().toLowerCase());
+
+    const candidates = teachers.filter(t => {
+      const isAbsent = t.nama === guruIzin;
+      const isNative = nativeTeachersToExclude.some(
+        nativeName => t.nama.trim().toLowerCase().includes(nativeName)
+      );
+      return !isAbsent && !isNative;
+    });
 
     const scoredCandidates = candidates.map(candidate => {
       let score = 0;

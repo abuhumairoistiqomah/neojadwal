@@ -54,6 +54,7 @@ export type ActivePage =
   | "list-mapel"
   | "jam-kosong-individu"
   | "jam-kosong-semua"
+  | "tabel-jam-kosong"
   | "input-pengganti"
   | "log-pengganti"
   | "statistik"

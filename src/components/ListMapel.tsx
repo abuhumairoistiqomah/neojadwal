@@ -19,6 +19,21 @@ interface GroupedMapelItem {
   waktu: string;
   isWaliAtauPendamping: boolean;
   roleType: "Wali Kelas" | "Pendamping" | "Pendamping Guru Mapel" | null;
+  statusType: "normal" | "gabung" | "bentrok";
+  teamTeaching: string[];
+}
+
+interface TeacherSlot {
+  hari: string;
+  jam_ke: number;
+  mulai: string;
+  selesai: string;
+  items: ScheduleItem[];
+  isOverlapping: boolean;
+  type: "normal" | "gabung" | "bentrok";
+  mapelDisplay: string;
+  kelasDisplay: string;
+  uniqueKelas: string[];
 }
 
 type SortKey = "mapel" | "hari" | "kelas" | "jp";
@@ -61,89 +76,168 @@ export const ListMapel: React.FC<ListMapelProps> = ({
         g => g && g.trim().toLowerCase() === selectedTeacher.trim().toLowerCase()
       )
     );
-    const groups: Record<string, { items: ScheduleItem[]; key: string }> = {};
 
+    // Group items by slot (hari and jam_ke) to identify overlaps (gabung/bentrok)
+    const slotGroups: Record<string, ScheduleItem[]> = {};
     teacherSchedules.forEach(item => {
-      const groupKey = `${item.mapel}_${item.kelas}`;
-      if (!groups[groupKey]) {
-        groups[groupKey] = { items: [], key: groupKey };
+      const normalizedH = normalizeDay(item.hari);
+      const slotKey = `${normalizedH}_${item.jam_ke}`;
+      if (!slotGroups[slotKey]) {
+        slotGroups[slotKey] = [];
       }
-      groups[groupKey].items.push(item);
+      slotGroups[slotKey].push(item);
+    });
+
+    // Create TeacherSlot array
+    const teacherSlots: TeacherSlot[] = Object.keys(slotGroups).map(slotKey => {
+      const items = slotGroups[slotKey];
+      const sample = items[0];
+      const normalizedH = normalizeDay(sample.hari);
+      
+      const isOverlapping = items.length >= 2;
+      let type: "normal" | "gabung" | "bentrok" = "normal";
+      
+      if (isOverlapping) {
+        const uniqueMapels = [...new Set(items.map(i => (i.mapel || "").trim()))];
+        const isAllSameMapel = uniqueMapels.length === 1;
+        type = isAllSameMapel ? "gabung" : "bentrok";
+      }
+
+      const uniqueMapelsList = [...new Set(items.map(i => i.mapel).filter(Boolean))];
+      const uniqueKelasList = [...new Set(items.map(i => i.kelas).filter(Boolean))];
+
+      return {
+        hari: normalizedH,
+        jam_ke: sample.jam_ke,
+        mulai: sample.mulai,
+        selesai: sample.selesai,
+        items,
+        isOverlapping,
+        type,
+        mapelDisplay: uniqueMapelsList.join(" & "),
+        kelasDisplay: uniqueKelasList.join(" & "),
+        uniqueKelas: uniqueKelasList,
+      };
+    });
+
+    // Group TeacherSlot items into grouped rows for the table.
+    // We group by mapelDisplay, kelasDisplay, and type, so that identical combinations are summed.
+    const groups: Record<string, { slots: TeacherSlot[]; key: string }> = {};
+
+    teacherSlots.forEach(slot => {
+      const groupKey = `${slot.mapelDisplay}_${slot.kelasDisplay}_${slot.type}`;
+      if (!groups[groupKey]) {
+        groups[groupKey] = { slots: [], key: groupKey };
+      }
+      groups[groupKey].slots.push(slot);
     });
 
     return Object.values(groups).map((group, index) => {
-      const sample = group.items[0];
-      const kelas = sample.kelas;
+      const firstSlot = group.slots[0];
       
-      // Sort items inside group to display days in logical order (Senin -> Jumat)
-      const sortedGroupItems = [...group.items].sort((a, b) => {
+      // Sort slots inside group to display days in logical order (Senin -> Jumat)
+      const sortedSlots = [...group.slots].sort((a, b) => {
         const orderA = HARI_ORDER[normalizeDay(a.hari)] || 99;
         const orderB = HARI_ORDER[normalizeDay(b.hari)] || 99;
         if (orderA !== orderB) return orderA - orderB;
         return a.jam_ke - b.jam_ke;
       });
 
-      // Get unique days (maintaining ordered days)
-      const uniqueDays = [...new Set(sortedGroupItems.map(i => normalizeDay(i.hari)))];
+      // Get unique days
+      const uniqueDays = [...new Set(sortedSlots.map(s => normalizeDay(s.hari)))];
       const displayDays = uniqueDays.join(", ");
 
       // Get unique times/periods
-      const uniqueTimes = [...new Set(sortedGroupItems.map(i => i.mulai && i.selesai ? `${i.mulai}-${i.selesai}` : ""))].filter(Boolean);
+      const uniqueTimes = [...new Set(sortedSlots.map(s => s.mulai && s.selesai ? `${s.mulai}-${s.selesai}` : ""))].filter(Boolean);
       const displayTimes = uniqueTimes.join(", ");
+
+      // Collect all classes across these slots
+      const allUniqueKelas = [...new Set(sortedSlots.flatMap(s => s.uniqueKelas))];
 
       let isWaliAtauPendamping = false;
       let roleType: "Wali Kelas" | "Pendamping" | "Pendamping Guru Mapel" | null = null;
 
-      if (currentTeacher.wali_kelas === kelas) {
+      const classesList = allUniqueKelas.map(k => k.trim().toLowerCase());
+      const waliKelasClean = currentTeacher.wali_kelas ? currentTeacher.wali_kelas.trim().toLowerCase() : "";
+      const pendampingKelasClean = currentTeacher.pendamping_kelas ? currentTeacher.pendamping_kelas.trim().toLowerCase() : "";
+
+      if (waliKelasClean && classesList.includes(waliKelasClean)) {
         isWaliAtauPendamping = true;
         roleType = "Wali Kelas";
-      } else if (currentTeacher.pendamping_kelas === kelas) {
+      } else if (pendampingKelasClean && classesList.includes(pendampingKelasClean)) {
         isWaliAtauPendamping = true;
         roleType = "Pendamping";
       } else {
         const isITBA = checkIsITBA(currentTeacher);
         if (isITBA) {
-          const sName = (sample.mapel || "").toLowerCase();
-          const isCoreQurany = 
-            sName.includes("qur'an") || 
-            sName.includes("quran") || 
-            sName.includes("tahsin") || 
-            sName.includes("tajwid") ||
-            sName.includes("tahfidz") ||
-            sName.includes("tahfizh") ||
-            sName.includes("tahfid") ||
-            sName.includes("tilawah") ||
-            sName.includes("murottal");
+          const hasNonCore = sortedSlots.some(slot => {
+            return slot.items.some(item => {
+              const sName = (item.mapel || "").toLowerCase();
+              const isCoreQurany = 
+                sName.includes("qur'an") || 
+                sName.includes("quran") || 
+                sName.includes("tahsin") || 
+                sName.includes("tajwid") ||
+                sName.includes("tahfidz") ||
+                sName.includes("tahfizh") ||
+                sName.includes("tahfid") ||
+                sName.includes("tilawah") ||
+                sName.includes("murottal");
 
-          const isKholidOrHariyadiq = 
-            currentTeacher.nama.toUpperCase().includes("KHOLID") || 
-            currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
-            currentTeacher.nama.toUpperCase().includes("HARIYADI");
+              const isKholidOrHariyadiq = 
+                currentTeacher.nama.toUpperCase().includes("KHOLID") || 
+                currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
+                currentTeacher.nama.toUpperCase().includes("HARIYADI");
 
-          const isPE = 
-            sName.includes("pe") || 
-            sName.includes("pjok") || 
-            sName.includes("penjas") || 
-            sName.includes("olahraga") ||
-            sName.includes("physical");
+              const isPE = 
+                sName.includes("pe") || 
+                sName.includes("pjok") || 
+                sName.includes("penjas") || 
+                sName.includes("olahraga") ||
+                sName.includes("physical");
 
-          const isCorePE = isKholidOrHariyadiq && isPE;
+              const isCorePE = isKholidOrHariyadiq && isPE;
 
-          if (!(isCoreQurany || isCorePE)) {
+              return !(isCoreQurany || isCorePE);
+            });
+          });
+
+          if (hasNonCore) {
             roleType = "Pendamping Guru Mapel";
           }
         }
       }
 
+      const teamTeachingList: string[] = [];
+      sortedSlots.forEach(slot => {
+        slot.items.forEach(item => {
+          const teachersInItem = [
+            item.guru1,
+            item.guru2,
+            item.guru3,
+            item.guru4,
+            item.guru5,
+            item.guru6
+          ].map(g => g?.trim()).filter(Boolean);
+          teachersInItem.forEach(tName => {
+            if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !teamTeachingList.includes(tName)) {
+              teamTeachingList.push(tName);
+            }
+          });
+        });
+      });
+
       return {
         id: `g-${index}`,
-        mapel: sample.mapel,
+        mapel: firstSlot.mapelDisplay,
         hari: displayDays,
-        kelas: kelas,
-        jp: group.items.length,
+        kelas: firstSlot.kelasDisplay,
+        jp: group.slots.length, // Count slots, so joint/conflict are counted as 1 JP per slot
         waktu: displayTimes,
         isWaliAtauPendamping,
         roleType,
+        statusType: firstSlot.type,
+        teamTeaching: teamTeachingList,
       };
     });
   }, [selectedTeacher, currentTeacher, schedules]);
@@ -179,6 +273,10 @@ export const ListMapel: React.FC<ListMapelProps> = ({
 
     return data;
   }, [groupedData, sortKey, sortOrder]);
+
+  const totalJP = useMemo(() => {
+    return sortedData.reduce((acc, curr) => acc + curr.jp, 0);
+  }, [sortedData]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -269,9 +367,15 @@ export const ListMapel: React.FC<ListMapelProps> = ({
             
             {/* Legend Banner */}
             <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-              <div>
-                <span className="text-xs text-gray-400 block font-semibold uppercase tracking-wider">Guru yang ditinjau</span>
-                <span className="text-base font-bold text-gray-800">{selectedTeacher}</span>
+              <div className="flex items-center gap-6">
+                <div>
+                  <span className="text-xs text-gray-400 block font-semibold uppercase tracking-wider">Guru yang ditinjau</span>
+                  <span className="text-base font-bold text-gray-800">{selectedTeacher}</span>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-xl flex items-center gap-2">
+                  <span className="text-indigo-600 font-extrabold text-lg">{totalJP} JP</span>
+                  <span className="text-xs text-indigo-800 font-bold uppercase tracking-wider">Total Beban Mengajar</span>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
                 {currentTeacher.wali_kelas && (
@@ -335,6 +439,7 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                     </th>
                     <th className="p-4">Waktu</th>
                     <th className="p-4">Peran Khusus</th>
+                    <th className="p-4">Team Teaching</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-sm">
@@ -350,7 +455,21 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                               : "hover:bg-gray-50/50"
                         }`}
                       >
-                        <td className="p-4 font-bold text-gray-800">{item.mapel}</td>
+                        <td className="p-4">
+                          <div className="font-bold text-gray-800">{item.mapel}</div>
+                          {item.statusType === "bentrok" && (
+                            <span className="mt-1.5 text-[9px] bg-red-100 text-red-800 border border-red-200 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                              Bentrok (Dihitung 1 JP)
+                            </span>
+                          )}
+                          {item.statusType === "gabung" && (
+                            <span className="mt-1.5 text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Kelas Gabungan (Dihitung 1 JP)
+                            </span>
+                          )}
+                        </td>
                         <td className="p-4 text-gray-600 font-medium">{item.hari}</td>
                         <td className="p-4 font-semibold text-gray-700">{item.kelas}</td>
                         <td className="p-4 text-center font-extrabold text-indigo-600">{item.jp} JP</td>
@@ -368,11 +487,24 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                             <span className="text-gray-300 text-xs">-</span>
                           )}
                         </td>
+                        <td className="p-4">
+                          {item.teamTeaching && item.teamTeaching.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {item.teamTeaching.map(name => (
+                                <span key={name} className="inline-block bg-slate-100 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded border border-slate-200">
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-gray-400 italic">
+                      <td colSpan={7} className="text-center py-8 text-gray-400 italic">
                         Tidak ada mata pelajaran yang diajar
                       </td>
                     </tr>
@@ -397,10 +529,22 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div>
-                        <h4 className="font-bold text-gray-900 text-base">{item.mapel}</h4>
+                        <h4 className="font-bold text-gray-900 text-base flex flex-wrap items-center gap-1.5">
+                          {item.mapel}
+                          {item.statusType === "bentrok" && (
+                            <span className="text-[8px] bg-red-100 text-red-800 border border-red-200 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                              Bentrok (1 JP)
+                            </span>
+                          )}
+                          {item.statusType === "gabung" && (
+                            <span className="text-[8px] bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                              Gabungan (1 JP)
+                            </span>
+                          )}
+                        </h4>
                         <span className="text-xs text-gray-500 font-medium">Hari {item.hari} {item.waktu ? `• Waktu: ${item.waktu}` : ""}</span>
                       </div>
-                      <span className="bg-indigo-50 text-indigo-700 font-extrabold text-xs px-2.5 py-1 rounded-lg">
+                      <span className="bg-indigo-50 text-indigo-700 font-extrabold text-xs px-2.5 py-1 rounded-lg shrink-0">
                         {item.jp} JP
                       </span>
                     </div>
@@ -420,6 +564,17 @@ export const ListMapel: React.FC<ListMapelProps> = ({
                         </span>
                       )}
                     </div>
+
+                    {item.teamTeaching && item.teamTeaching.length > 0 && (
+                      <div className="mt-2 text-[11px] border-t border-gray-100/30 pt-2 flex items-center flex-wrap gap-1">
+                        <span className="text-gray-400 font-medium mr-1">Team Teaching:</span>
+                        {item.teamTeaching.map(name => (
+                          <span key={name} className="inline-block bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (

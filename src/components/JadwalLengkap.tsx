@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Teacher, ScheduleItem, normalizeDay } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA } from "../types";
 import { ArrowLeft, BookOpen, AlertCircle, HelpCircle, Search } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -38,6 +38,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
 
   // Active teacher
   const currentTeacher = teachers.find(t => t.nama === selectedTeacher);
+  const isITBA = currentTeacher ? checkIsITBA(currentTeacher) : false;
 
   // Filter schedules
   const teacherSchedules = schedules.filter(s => 
@@ -142,8 +143,15 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
             {/* Teacher Header and JP summary */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 bg-slate-50 rounded-2xl gap-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">{selectedTeacher}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-slate-800">{selectedTeacher}</h3>
+                  {isITBA && (
+                    <span className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200 font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      Mahasiswa ITBA
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
                   Mata Pelajaran Utama: {currentTeacher?.mapel_utama || "Tidak terdaftar"} | Rumpun: {currentTeacher?.rumpun || "-"}
                 </p>
               </div>
@@ -169,6 +177,12 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                 <span className="w-3.5 h-3.5 rounded bg-emerald-100 border border-emerald-200"></span>
                 Kelas Gabung (Hijau)
               </span>
+              {isITBA && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3.5 h-3.5 rounded bg-purple-100 border border-purple-200"></span>
+                  Pendamping Guru Mapel (Ungu)
+                </span>
+              )}
               <span className="flex items-center gap-1.5 ml-auto">
                 <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
                 Dua kelas bersamaan diampu satu ustadz dihitung sebagai 1 JP
@@ -209,6 +223,38 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           );
                           const isConflict = items.length >= 2 && !isSlotGabung;
 
+                          const isPendampingSlot = isITBA && items.some(item => {
+                            const sName = (item.mapel || "").toLowerCase();
+                            const isCoreQurany = 
+                              sName.includes("qur'an") || 
+                              sName.includes("quran") || 
+                              sName.includes("tahsin") || 
+                              sName.includes("tajwid") ||
+                              sName.includes("tahfidz") ||
+                              sName.includes("tahfizh") ||
+                              sName.includes("tahfid") ||
+                              sName.includes("tilawah") ||
+                              sName.includes("murottal");
+
+                            const isKholidOrHariyadiq = 
+                              currentTeacher && (
+                                currentTeacher.nama.toUpperCase().includes("KHOLID") || 
+                                currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
+                                currentTeacher.nama.toUpperCase().includes("HARIYADI")
+                              );
+
+                            const isPE = 
+                              sName.includes("pe") || 
+                              sName.includes("pjok") || 
+                              sName.includes("penjas") || 
+                              sName.includes("olahraga") ||
+                              sName.includes("physical");
+
+                            const isCorePE = isKholidOrHariyadiq && isPE;
+
+                            return !(isCoreQurany || isCorePE);
+                          });
+
                           const uniqueMapels = [...new Set(items.map(i => i.mapel))];
                           const uniqueKelas = [...new Set(items.map(i => i.kelas))];
                           const displayMapel = uniqueMapels.join(" & ");
@@ -218,7 +264,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           let cellClasses = "";
                           let badge = null;
 
-                          if (isSlotGabung) {
+                          if (isPendampingSlot) {
+                            cellClasses = "bg-purple-50 text-purple-900 border-l-2 border-l-purple-400 border-purple-100";
+                            badge = (
+                              <span className="mt-1.5 text-[8px] bg-purple-100 text-purple-800 border border-purple-200 font-bold px-1 py-0.5 rounded uppercase tracking-wider inline-block">
+                                Pendamping (1 JP)
+                              </span>
+                            );
+                          } else if (isSlotGabung) {
                             cellClasses = "bg-emerald-50 text-emerald-900 border-l-2 border-l-emerald-400 border-emerald-100";
                             badge = (
                               <span className="mt-1.5 text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 py-0.5 rounded uppercase tracking-wider inline-block">
@@ -338,6 +391,38 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                             );
                             const isConflict = items.length >= 2 && !isSlotGabung;
 
+                            const isPendampingSlot = isITBA && items.some(item => {
+                              const sName = (item.mapel || "").toLowerCase();
+                              const isCoreQurany = 
+                                sName.includes("qur'an") || 
+                                sName.includes("quran") || 
+                                sName.includes("tahsin") || 
+                                sName.includes("tajwid") ||
+                                sName.includes("tahfidz") ||
+                                sName.includes("tahfizh") ||
+                                sName.includes("tahfid") ||
+                                sName.includes("tilawah") ||
+                                sName.includes("murottal");
+
+                              const isKholidOrHariyadiq = 
+                                currentTeacher && (
+                                  currentTeacher.nama.toUpperCase().includes("KHOLID") || 
+                                  currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
+                                  currentTeacher.nama.toUpperCase().includes("HARIYADI")
+                                );
+
+                              const isPE = 
+                                sName.includes("pe") || 
+                                sName.includes("pjok") || 
+                                sName.includes("penjas") || 
+                                sName.includes("olahraga") ||
+                                sName.includes("physical");
+
+                              const isCorePE = isKholidOrHariyadiq && isPE;
+
+                              return !(isCoreQurany || isCorePE);
+                            });
+
                             const uniqueMapels = [...new Set(items.map(i => i.mapel))];
                             const uniqueKelas = [...new Set(items.map(i => i.kelas))];
                             const displayMapel = uniqueMapels.join(" & ");
@@ -347,7 +432,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                             let bgClasses = "";
                             let badge = null;
 
-                            if (isSlotGabung) {
+                            if (isPendampingSlot) {
+                              bgClasses = "bg-purple-50 border-purple-100 text-purple-900";
+                              badge = (
+                                <span className="text-[8px] bg-purple-100 text-purple-800 border border-purple-200 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
+                                  Pendamping (1 JP)
+                                </span>
+                              );
+                            } else if (isSlotGabung) {
                               bgClasses = "bg-emerald-50 border-emerald-100 text-emerald-900";
                               badge = (
                                 <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 py-0.5 rounded uppercase tracking-wider">
