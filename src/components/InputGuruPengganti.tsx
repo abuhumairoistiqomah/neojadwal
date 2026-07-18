@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, isSameDay } from "../types";
+import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, isSameDay, isITBACoreSubject } from "../types";
 import { 
   ArrowLeft, Calendar, UserCheck, HelpCircle, Save, 
   Trash2, Plus, Sparkles, CheckSquare, AlertTriangle, AlertCircle 
@@ -164,33 +164,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         if (!isScheduled) return false;
 
         if (isITBA) {
-          const sName = (s.mapel || "").toLowerCase();
-          const isCoreQurany = 
-            sName.includes("qur'an") || 
-            sName.includes("quran") || 
-            sName.includes("tahsin") || 
-            sName.includes("tajwid") ||
-            sName.includes("tahfidz") ||
-            sName.includes("tahfizh") ||
-            sName.includes("tahfid") ||
-            sName.includes("tilawah") ||
-            sName.includes("murottal");
-
-          const isKholidOrHariyadiq = 
-            candidate.nama.toUpperCase().includes("KHOLID") || 
-            candidate.nama.toUpperCase().includes("HARIYADIQ") ||
-            candidate.nama.toUpperCase().includes("HARIYADI");
-
-          const isPE = 
-            sName.includes("pe") || 
-            sName.includes("pjok") || 
-            sName.includes("penjas") || 
-            sName.includes("olahraga") ||
-            sName.includes("physical");
-
-          const isCorePE = isKholidOrHariyadiq && isPE;
-
-          return isCoreQurany || isCorePE;
+          return isITBACoreSubject(s.mapel, candidate.nama);
         }
 
         return true;

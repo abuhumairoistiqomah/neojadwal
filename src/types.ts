@@ -97,4 +97,49 @@ export function checkIsITBA(teacher: Teacher | undefined): boolean {
   );
 }
 
+export function isITBACoreSubject(mapelName: string, teacherName?: string): boolean {
+  if (!mapelName) return false;
+  const sName = mapelName.trim().toLowerCase();
+  
+  // Arabic & Qur'an core subjects
+  const isCoreQuranyOrArabic = 
+    sName.includes("qur'an") || 
+    sName.includes("quran") || 
+    sName.includes("tahsin") || 
+    sName.includes("tajwid") ||
+    sName.includes("tahfidz") ||
+    sName.includes("tahfizh") ||
+    sName.includes("tahfid") ||
+    sName.includes("tilawah") ||
+    sName.includes("murottal") ||
+    sName.includes("arabic") ||
+    sName.includes("bahasa arab") ||
+    sName.includes("arab") ||
+    sName.includes("b. arab") ||
+    sName.includes("b.arab");
+
+  if (isCoreQuranyOrArabic) return true;
+
+  // PE for Kholid or Hariyadi
+  if (teacherName) {
+    const tUpper = teacherName.toUpperCase();
+    const isKholidOrHariyadiq = 
+      tUpper.includes("KHOLID") || 
+      tUpper.includes("HARIYADIQ") ||
+      tUpper.includes("HARIYADI");
+    
+    if (isKholidOrHariyadiq) {
+      const isPE = 
+        sName.includes("pe") || 
+        sName.includes("pjok") || 
+        sName.includes("penjas") || 
+        sName.includes("olahraga") ||
+        sName.includes("physical");
+      if (isPE) return true;
+    }
+  }
+
+  return false;
+}
+
 

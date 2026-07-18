@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, normalizeDay, checkIsITBA } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isITBACoreSubject } from "../types";
 import { ArrowLeft, BookOpen, ChevronUp, ChevronDown, UserCheck, Search, HelpCircle } from "lucide-react";
 
 interface ListMapelProps {
@@ -172,33 +172,7 @@ export const ListMapel: React.FC<ListMapelProps> = ({
         if (isITBA) {
           const hasNonCore = sortedSlots.some(slot => {
             return slot.items.some(item => {
-              const sName = (item.mapel || "").toLowerCase();
-              const isCoreQurany = 
-                sName.includes("qur'an") || 
-                sName.includes("quran") || 
-                sName.includes("tahsin") || 
-                sName.includes("tajwid") ||
-                sName.includes("tahfidz") ||
-                sName.includes("tahfizh") ||
-                sName.includes("tahfid") ||
-                sName.includes("tilawah") ||
-                sName.includes("murottal");
-
-              const isKholidOrHariyadiq = 
-                currentTeacher.nama.toUpperCase().includes("KHOLID") || 
-                currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
-                currentTeacher.nama.toUpperCase().includes("HARIYADI");
-
-              const isPE = 
-                sName.includes("pe") || 
-                sName.includes("pjok") || 
-                sName.includes("penjas") || 
-                sName.includes("olahraga") ||
-                sName.includes("physical");
-
-              const isCorePE = isKholidOrHariyadiq && isPE;
-
-              return !(isCoreQurany || isCorePE);
+              return !isITBACoreSubject(item.mapel, currentTeacher.nama);
             });
           });
 

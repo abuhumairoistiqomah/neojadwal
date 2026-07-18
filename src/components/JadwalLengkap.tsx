@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Teacher, ScheduleItem, normalizeDay, checkIsITBA } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isITBACoreSubject } from "../types";
 import { ArrowLeft, BookOpen, AlertCircle, HelpCircle, Search, X, Clock, User, Calendar, GraduationCap, Users } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -242,35 +242,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           const isConflict = items.length >= 2 && !isSlotGabung;
 
                           const isPendampingSlot = isITBA && items.some(item => {
-                            const sName = (item.mapel || "").toLowerCase();
-                            const isCoreQurany = 
-                              sName.includes("qur'an") || 
-                              sName.includes("quran") || 
-                              sName.includes("tahsin") || 
-                              sName.includes("tajwid") ||
-                              sName.includes("tahfidz") ||
-                              sName.includes("tahfizh") ||
-                              sName.includes("tahfid") ||
-                              sName.includes("tilawah") ||
-                              sName.includes("murottal");
-
-                            const isKholidOrHariyadiq = 
-                              currentTeacher && (
-                                currentTeacher.nama.toUpperCase().includes("KHOLID") || 
-                                currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
-                                currentTeacher.nama.toUpperCase().includes("HARIYADI")
-                              );
-
-                            const isPE = 
-                              sName.includes("pe") || 
-                              sName.includes("pjok") || 
-                              sName.includes("penjas") || 
-                              sName.includes("olahraga") ||
-                              sName.includes("physical");
-
-                            const isCorePE = isKholidOrHariyadiq && isPE;
-
-                            return !(isCoreQurany || isCorePE);
+                            return !isITBACoreSubject(item.mapel, currentTeacher?.nama);
                           });
 
                           const uniqueMapels = [...new Set(items.map(i => i.mapel))];
@@ -430,35 +402,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                             const isConflict = items.length >= 2 && !isSlotGabung;
 
                             const isPendampingSlot = isITBA && items.some(item => {
-                              const sName = (item.mapel || "").toLowerCase();
-                              const isCoreQurany = 
-                                sName.includes("qur'an") || 
-                                sName.includes("quran") || 
-                                sName.includes("tahsin") || 
-                                sName.includes("tajwid") ||
-                                sName.includes("tahfidz") ||
-                                sName.includes("tahfizh") ||
-                                sName.includes("tahfid") ||
-                                sName.includes("tilawah") ||
-                                sName.includes("murottal");
-
-                              const isKholidOrHariyadiq = 
-                                currentTeacher && (
-                                  currentTeacher.nama.toUpperCase().includes("KHOLID") || 
-                                  currentTeacher.nama.toUpperCase().includes("HARIYADIQ") ||
-                                  currentTeacher.nama.toUpperCase().includes("HARIYADI")
-                                );
-
-                              const isPE = 
-                                sName.includes("pe") || 
-                                sName.includes("pjok") || 
-                                sName.includes("penjas") || 
-                                sName.includes("olahraga") ||
-                                sName.includes("physical");
-
-                              const isCorePE = isKholidOrHariyadiq && isPE;
-
-                              return !(isCoreQurany || isCorePE);
+                              return !isITBACoreSubject(item.mapel, currentTeacher?.nama);
                             });
 
                             const uniqueMapels = [...new Set(items.map(i => i.mapel))];

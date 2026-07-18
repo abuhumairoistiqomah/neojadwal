@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, isSameDay, checkIsITBA } from "../types";
+import { Teacher, ScheduleItem, isSameDay, checkIsITBA, isITBACoreSubject } from "../types";
 import { ArrowLeft, Users, Clock, Calendar, CheckSquare, Search, AlertCircle, ShieldAlert } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -49,33 +49,7 @@ export const JamKosongSemua: React.FC<JamKosongSemuaProps> = ({
         if (isITBA) {
           // Check if any of these scheduled slots are core/mandatory
           const hasCore = scheduledSlots.some(s => {
-            const sName = (s.mapel || "").toLowerCase();
-            const isCoreQurany = 
-              sName.includes("qur'an") || 
-              sName.includes("quran") || 
-              sName.includes("tahsin") || 
-              sName.includes("tajwid") ||
-              sName.includes("tahfidz") ||
-              sName.includes("tahfizh") ||
-              sName.includes("tahfid") ||
-              sName.includes("tilawah") ||
-              sName.includes("murottal");
-
-            const isKholidOrHariyadiq = 
-              teacher.nama.toUpperCase().includes("KHOLID") || 
-              teacher.nama.toUpperCase().includes("HARIYADIQ") ||
-              teacher.nama.toUpperCase().includes("HARIYADI");
-
-            const isPE = 
-              sName.includes("pe") || 
-              sName.includes("pjok") || 
-              sName.includes("penjas") || 
-              sName.includes("olahraga") ||
-              sName.includes("physical");
-
-            const isCorePE = isKholidOrHariyadiq && isPE;
-
-            return isCoreQurany || isCorePE;
+            return isITBACoreSubject(s.mapel, teacher.nama);
           });
 
           if (!hasCore) {
