@@ -672,7 +672,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           )}
                           {group.keterangan_khusus && (
                             <span className="text-xs text-indigo-600 font-medium mt-1 block bg-indigo-50/50 p-2 rounded-lg border border-indigo-100/30">
-                              Keterangan Khusus / MQ: <span className="font-bold text-indigo-700">{group.keterangan_khusus}</span>
+                              Keterangan Khusus: <span className="font-bold text-indigo-700">{group.keterangan_khusus}</span>
                             </span>
                           )}
                           {group.kelasgabung && (

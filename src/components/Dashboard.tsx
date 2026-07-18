@@ -297,7 +297,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 let labelText = "Kelas Tunggal";
                 let tagClass = "bg-blue-200/70 text-blue-900 border border-blue-300";
 
-                if (isPendampingSlot && isGabung) {
+                if (isPendampingSlot) {
                   cardBgClass = "bg-purple-50 hover:bg-purple-100/60 border-purple-300 border-2 text-purple-950";
                   badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
                   dotClass = "bg-purple-500";
@@ -387,17 +387,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div>
                           <span className="block text-[10px] uppercase font-bold opacity-60">Kelas</span>
                           <span className="font-semibold">{item.kelas}</span>
+                          {item.keterangan_khusus && (
+                            <span className="block text-[11px] font-medium text-indigo-600 mt-0.5">
+                              Keterangan Khusus: {item.keterangan_khusus}
+                            </span>
+                          )}
                         </div>
                         {item.ruangan && (
                           <div>
                             <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
                             <span className="font-semibold">{item.ruangan}</span>
-                          </div>
-                        )}
-                        {item.keterangan_khusus && (
-                          <div className="border-l border-slate-200 pl-4">
-                            <span className="block text-[10px] uppercase font-bold opacity-60 text-indigo-600">Keterangan Khusus / MQ</span>
-                            <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block">{item.keterangan_khusus}</span>
                           </div>
                         )}
                       </div>
