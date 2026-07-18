@@ -218,7 +218,6 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                     {JAM_LIST.map(jam => (
                       <th key={jam} className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-r border-slate-200 last:border-0">
                         <div>Jam ke-{jam}</div>
-                        <div className="text-[10px] font-medium text-slate-400 mt-1">{JAM_TIME_MAP[jam]}</div>
                       </th>
                     ))}
                   </tr>
