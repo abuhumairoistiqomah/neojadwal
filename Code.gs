@@ -73,7 +73,9 @@ function doGet(e) {
       "guru4": "guru4", "guru 4": "guru4", "guru_4": "guru4", "teacher 4": "guru4",
       "guru5": "guru5", "guru 5": "guru5", "guru_5": "guru5", "teacher 5": "guru5",
       "guru6": "guru6", "guru 6": "guru6", "guru_6": "guru6", "teacher 6": "guru6",
-      "kelasgabung": "kelasgabung", "kelas gabung": "kelasgabung", "kelas_gabung": "kelasgabung", "gabung": "kelasgabung", "merged": "kelasgabung"
+      "kelasgabung": "kelasgabung", "kelas gabung": "kelasgabung", "kelas_gabung": "kelasgabung", "gabung": "kelasgabung", "merged": "kelasgabung",
+      "selainguru1_mengawas": "selainguru1_mengawas", "selainguru1 mengawas": "selainguru1_mengawas", "selain guru 1 mengawas": "selainguru1_mengawas",
+      "keterangan_khusus": "keterangan_khusus", "keterangan khusus": "keterangan_khusus"
     });
 
     // 3. Ambil data Log Izin dengan mapping alias robust
@@ -261,9 +263,9 @@ function initSheetsIfMissing(ss) {
   sheet = ss.getSheetByName("Jadwal");
   if (!sheet) {
     sheet = ss.insertSheet("Jadwal");
-    sheet.appendRow(["kelas", "hari", "jamke", "mulai", "selesai", "mata pelajaran", "guru1", "guru2", "guru3", "guru4", "guru5", "guru6", "kelasgabung"]);
-    sheet.appendRow(["01 INTER 1", "Senin", 1, "07:40", "08:40", "Al-Qur'an", "AHMAD ZAKI", "MR QUR'AN 1", "", "", "", "", "Tidak"]);
-    sheet.appendRow(["01 INTER 1", "Senin", 2, "08:40", "09:40", "Math", "MUHAMMAD RIJAL ABDURAHMAN, S.M.Gr.", "", "", "", "", "", "Tidak"]);
+    sheet.appendRow(["kelas", "hari", "jamke", "mulai", "selesai", "mata pelajaran", "guru1", "guru2", "guru3", "guru4", "guru5", "guru6", "kelasgabung", "selainguru1_mengawas", "keterangan_khusus"]);
+    sheet.appendRow(["01 INTER 1", "Senin", 1, "07:40", "08:40", "Al-Qur'an", "AHMAD ZAKI", "MR QUR'AN 1", "", "", "", "", "Tidak", "No", ""]);
+    sheet.appendRow(["01 INTER 1", "Senin", 2, "08:40", "09:40", "Math", "MUHAMMAD RIJAL ABDURAHMAN, S.M.Gr.", "", "", "", "", "", "Tidak", "No", ""]);
   }
 
   // 3. Log_Izin

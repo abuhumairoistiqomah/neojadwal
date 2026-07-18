@@ -158,13 +158,19 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       const isBusy = schedules.some(s => {
         if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
         
-        const isScheduled = [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+        const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
+        const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
           g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
         );
-        if (!isScheduled) return false;
+        if (!isGuru1 && !isAssisting) return false;
 
         if (isITBA) {
           return isITBACoreSubject(s.mapel, candidate.nama);
+        }
+
+        if (isAssisting) {
+          const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
+          if (isSupervisingCol) return false;
         }
 
         return true;

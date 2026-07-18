@@ -46,21 +46,27 @@ export const JamKosongSemua: React.FC<JamKosongSemuaProps> = ({
         });
       } else {
         const isITBA = checkIsITBA(teacher);
-        if (isITBA) {
-          // Check if any of these scheduled slots are core/mandatory
-          const hasCore = scheduledSlots.some(s => {
+        
+        const hasCoreOrNonSupervising = scheduledSlots.some(s => {
+          const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === teacher.nama.trim().toLowerCase();
+          
+          if (isITBA) {
             return isITBACoreSubject(s.mapel, teacher.nama);
-          });
-
-          if (!hasCore) {
-            // It's a non-core task, so this ITBA teacher is free but doing an extra task (pendamping)
-            const tasks = scheduledSlots.map(s => `${s.mapel} (Kelas ${s.kelas})`).join(", ");
-            list.push({
-              teacher,
-              isExtraTask: true,
-              extraTaskLabel: `Sedang Mendampingi: ${tasks}`
-            });
           }
+
+          if (isGuru1) return true;
+
+          const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
+          return !isSupervisingCol;
+        });
+
+        if (!hasCoreOrNonSupervising) {
+          const tasks = scheduledSlots.map(s => `${s.mapel} (Kelas ${s.kelas})`).join(", ");
+          list.push({
+            teacher,
+            isExtraTask: true,
+            extraTaskLabel: `Sedang Mendampingi: ${tasks}`
+          });
         }
       }
     });

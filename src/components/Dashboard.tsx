@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Teacher, ScheduleItem, ActivePage, isSameDay } from "../types";
+import { Teacher, ScheduleItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
   History, BarChart2, Shield, User, ChevronRight, X, Table 
@@ -123,6 +123,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const mapel = [...new Set(items.map(i => i.mapel))].filter(Boolean).join(", ");
         const kelas = [...new Set(items.map(i => i.kelas))].filter(Boolean).join(", ");
         const ruangan = [...new Set(items.map(i => i.ruangan || "").filter(Boolean))].join(", ");
+        const keterangan_khusus = [...new Set(items.map(i => i.keterangan_khusus || "").filter(Boolean))].join(", ");
 
         // Determine if kelasgabung is "iya" / "ya" (case-insensitive)
         const isIya = items.some(i => {
@@ -138,6 +139,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           mapel,
           kelas,
           ruangan,
+          keterangan_khusus,
           kelasgabung: isIya ? "Iya" : "Tidak",
           isConflict: items.length > 1,
           items // keep original list
@@ -278,13 +280,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 const isConflict = item.isConflict;
                 const isGabung = item.kelasgabung === "Iya";
                 
+                const isITBA = currentTeacherObj ? checkIsITBA(currentTeacherObj) : false;
+                const isPendampingSlot = item.items.some(scItem => {
+                  const isGuru1 = scItem.guru1 && scItem.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
+                  if (isITBA) {
+                    return !isITBACoreSubject(scItem.mapel, selectedTeacher);
+                  } else {
+                    const isSupervisingCol = scItem.selainguru1_mengawas && (scItem.selainguru1_mengawas.trim().toLowerCase() === "yes" || scItem.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                    return !isGuru1 && isSupervisingCol;
+                  }
+                });
+
                 let cardBgClass = "bg-blue-50 hover:bg-blue-100/60 border-blue-200 text-blue-950";
                 let badgeClass = "bg-blue-100 text-blue-900 border border-blue-200";
                 let dotClass = "bg-blue-500";
                 let labelText = "Kelas Tunggal";
                 let tagClass = "bg-blue-200/70 text-blue-900 border border-blue-300";
 
-                if (isConflict) {
+                if (isPendampingSlot && isGabung) {
+                  cardBgClass = "bg-purple-50 hover:bg-purple-100/60 border-purple-300 border-2 text-purple-950";
+                  badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
+                  dotClass = "bg-purple-500";
+                  labelText = "Pendamping";
+                  tagClass = "bg-purple-200/70 text-purple-900 border border-purple-300";
+                } else if (isConflict) {
                   if (isGabung) {
                     cardBgClass = "bg-emerald-50 hover:bg-emerald-100/60 border-emerald-200 text-emerald-950";
                     badgeClass = "bg-emerald-100 text-emerald-900 border border-emerald-200";
@@ -364,7 +383,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         })()}
                       </div>
 
-                      <div className="flex items-center gap-6 text-sm">
+                      <div className="flex flex-wrap items-center gap-6 text-sm">
                         <div>
                           <span className="block text-[10px] uppercase font-bold opacity-60">Kelas</span>
                           <span className="font-semibold">{item.kelas}</span>
@@ -373,6 +392,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <div>
                             <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
                             <span className="font-semibold">{item.ruangan}</span>
+                          </div>
+                        )}
+                        {item.keterangan_khusus && (
+                          <div className="border-l border-slate-200 pl-4">
+                            <span className="block text-[10px] uppercase font-bold opacity-60 text-indigo-600">Keterangan Khusus / MQ</span>
+                            <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-xs inline-block">{item.keterangan_khusus}</span>
                           </div>
                         )}
                       </div>

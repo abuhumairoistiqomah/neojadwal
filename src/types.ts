@@ -27,6 +27,8 @@ export interface ScheduleItem {
   guru6: string;
   kelasgabung: string;
   ruangan?: string;
+  selainguru1_mengawas?: string;
+  keterangan_khusus?: string;
 }
 
 export interface LogIzinItem {

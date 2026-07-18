@@ -74,14 +74,21 @@ export const JamKosongIndividu: React.FC<JamKosongIndividuProps> = ({
             isExtraTask: false,
             extraTaskLabel: ""
           });
-        } else if (isITBA) {
-          // Check if any of these scheduled slots are core/mandatory
-          const hasCore = scheduledSlots.some(s => {
-            return isITBACoreSubject(s.mapel, selectedTeacher);
+        } else {
+          const hasCoreOrNonSupervising = scheduledSlots.some(s => {
+            const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
+            
+            if (isITBA) {
+              return isITBACoreSubject(s.mapel, selectedTeacher);
+            }
+
+            if (isGuru1) return true;
+
+            const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
+            return !isSupervisingCol;
           });
 
-          if (!hasCore) {
-            // It's a non-core task, so this ITBA teacher is free but doing an extra task (pendamping)
+          if (!hasCoreOrNonSupervising) {
             const tasks = scheduledSlots.map(s => `${s.mapel} (Kelas ${s.kelas})`).join(", ");
             slots.push({
               id: `free-${hari}-${jam}`,

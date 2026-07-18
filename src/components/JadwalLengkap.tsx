@@ -240,8 +240,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           );
                           const isConflict = items.length >= 2 && !isSlotGabung;
 
-                          const isPendampingSlot = isITBA && items.some(item => {
-                            return !isITBACoreSubject(item.mapel, currentTeacher?.nama);
+                          const isPendampingSlot = items.some(item => {
+                            const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === currentTeacher?.nama.trim().toLowerCase();
+                            if (isITBA) {
+                              return !isITBACoreSubject(item.mapel, currentTeacher?.nama);
+                            } else {
+                              const isSupervisingCol = item.selainguru1_mengawas && (item.selainguru1_mengawas.trim().toLowerCase() === "yes" || item.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                              return !isGuru1 && isSupervisingCol;
+                            }
                           });
 
                           const uniqueMapels = [...new Set(items.map(i => i.mapel))];
@@ -400,8 +406,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                             );
                             const isConflict = items.length >= 2 && !isSlotGabung;
 
-                            const isPendampingSlot = isITBA && items.some(item => {
-                              return !isITBACoreSubject(item.mapel, currentTeacher?.nama);
+                            const isPendampingSlot = items.some(item => {
+                              const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === currentTeacher?.nama.trim().toLowerCase();
+                              if (isITBA) {
+                                return !isITBACoreSubject(item.mapel, currentTeacher?.nama);
+                              } else {
+                                const isSupervisingCol = item.selainguru1_mengawas && (item.selainguru1_mengawas.trim().toLowerCase() === "yes" || item.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                                return !isGuru1 && isSupervisingCol;
+                              }
                             });
 
                             const uniqueMapels = [...new Set(items.map(i => i.mapel))];
@@ -582,13 +594,14 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                     mapel: string;
                     kelasNames: string[];
                     ruangan?: string;
+                    keterangan_khusus?: string;
                     kelasgabung: boolean;
                     teachers: string[];
                     originalItem: ScheduleItem;
                   }
                   
                   const groupedItems: GroupedScheduleItem[] = [];
-
+ 
                   selectedDetail.items.forEach(item => {
                     const itemTeachers = [
                       item.guru1,
@@ -598,7 +611,7 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                       item.guru5,
                       item.guru6
                     ].map(g => g?.trim()).filter(Boolean);
-
+ 
                     // Find if we already have a group with the same mapel and teachers
                     const existingGroup = groupedItems.find(g => {
                       const isSameMapel = g.mapel.trim().toLowerCase() === item.mapel.trim().toLowerCase();
@@ -606,12 +619,12 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                         g.teachers.every((t, i) => t.toLowerCase() === itemTeachers[i].toLowerCase());
                       return isSameMapel && isSameTeachers;
                     });
-
+ 
                     const isItemKelasGabung = item.kelasgabung && (
                       item.kelasgabung.trim().toLowerCase() === "ya" || 
                       item.kelasgabung.trim().toLowerCase() === "iya"
                     );
-
+ 
                     if (existingGroup) {
                       if (!existingGroup.kelasNames.includes(item.kelas)) {
                         existingGroup.kelasNames.push(item.kelas);
@@ -622,11 +635,15 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                       if (item.ruangan && !existingGroup.ruangan?.includes(item.ruangan)) {
                         existingGroup.ruangan = existingGroup.ruangan ? `${existingGroup.ruangan}, ${item.ruangan}` : item.ruangan;
                       }
+                      if (item.keterangan_khusus && !existingGroup.keterangan_khusus?.includes(item.keterangan_khusus)) {
+                        existingGroup.keterangan_khusus = existingGroup.keterangan_khusus ? `${existingGroup.keterangan_khusus}, ${item.keterangan_khusus}` : item.keterangan_khusus;
+                      }
                     } else {
                       groupedItems.push({
                         mapel: item.mapel,
                         kelasNames: [item.kelas],
                         ruangan: item.ruangan,
+                        keterangan_khusus: item.keterangan_khusus,
                         kelasgabung: isItemKelasGabung,
                         teachers: itemTeachers,
                         originalItem: item
@@ -651,6 +668,11 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           {group.ruangan && (
                             <span className="text-xs text-slate-500 font-medium mt-1 block">
                               Ruangan: <span className="font-semibold text-slate-700">{group.ruangan}</span>
+                            </span>
+                          )}
+                          {group.keterangan_khusus && (
+                            <span className="text-xs text-indigo-600 font-medium mt-1 block bg-indigo-50/50 p-2 rounded-lg border border-indigo-100/30">
+                              Keterangan Khusus / MQ: <span className="font-bold text-indigo-700">{group.keterangan_khusus}</span>
                             </span>
                           )}
                           {group.kelasgabung && (

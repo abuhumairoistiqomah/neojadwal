@@ -1394,6 +1394,7 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                     mapel: string;
                     kelasNames: string[];
                     ruangan?: string;
+                    keterangan_khusus?: string;
                     kelasgabung: boolean;
                     teachers: string[];
                     originalItem: ScheduleItem;
@@ -1434,11 +1435,15 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                       if (item.ruangan && !existingGroup.ruangan?.includes(item.ruangan)) {
                         existingGroup.ruangan = existingGroup.ruangan ? `${existingGroup.ruangan}, ${item.ruangan}` : item.ruangan;
                       }
+                      if (item.keterangan_khusus && !existingGroup.keterangan_khusus?.includes(item.keterangan_khusus)) {
+                        existingGroup.keterangan_khusus = existingGroup.keterangan_khusus ? `${existingGroup.keterangan_khusus}, ${item.keterangan_khusus}` : item.keterangan_khusus;
+                      }
                     } else {
                       groupedItems.push({
                         mapel: item.mapel,
                         kelasNames: [item.kelas],
                         ruangan: item.ruangan,
+                        keterangan_khusus: item.keterangan_khusus,
                         kelasgabung: isItemKelasGabung,
                         teachers: itemTeachers,
                         originalItem: item
@@ -1465,6 +1470,11 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                               Ruangan: <span className="font-semibold text-slate-700">{group.ruangan}</span>
                             </span>
                           )}
+                          {group.keterangan_khusus && (
+                            <span className="text-xs text-indigo-600 font-medium mt-1 block bg-indigo-50/50 p-2 rounded-lg border border-indigo-100/30">
+                              Keterangan Khusus / MQ: <span className="font-bold text-indigo-700">{group.keterangan_khusus}</span>
+                            </span>
+                          )}
                           {group.kelasgabung && (
                             <span className="mt-1.5 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded uppercase tracking-wider inline-block">
                               Kelas Gabung
@@ -1484,25 +1494,20 @@ export const JadwalKelas: React.FC<JadwalKelasProps> = ({
                               const isMainTeacher = tIdx === 0;
                               const displayName = getTeacherDisplayName(teacherName);
                               return (
-                                <div key={tIdx} className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-slate-100">
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                                      isMainTeacher ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-blue-50 text-blue-600 border border-blue-200"
-                                    }`}>
-                                      {teacherName.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                      <span className="text-xs font-bold text-slate-800 block">
-                                        {teacherName} {displayName && displayName !== teacherName ? `(${displayName})` : ""}
-                                      </span>
-                                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wide">
-                                        {isMainTeacher ? "Guru Utama (Main)" : `Guru Partner ${tIdx}`}
-                                      </span>
-                                    </div>
+                                <div key={tIdx} className="flex items-center gap-3 bg-white p-2.5 rounded-lg border border-slate-100">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                                    isMainTeacher ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-blue-50 text-blue-600 border border-blue-200"
+                                  }`}>
+                                    {teacherName.charAt(0).toUpperCase()}
                                   </div>
-                                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg shrink-0">
-                                    {teacherJpMap[teacherName?.trim()] || 0} JP
-                                  </span>
+                                  <div>
+                                    <span className="text-xs font-bold text-slate-800 block">
+                                      {teacherName} {displayName && displayName !== teacherName ? `(${displayName})` : ""}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wide">
+                                      {isMainTeacher ? "Guru Utama (Main)" : `Guru Partner ${tIdx}`}
+                                    </span>
+                                  </div>
                                 </div>
                               );
                             })}

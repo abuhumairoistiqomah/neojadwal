@@ -169,16 +169,20 @@ export const ListMapel: React.FC<ListMapelProps> = ({
         roleType = "Pendamping";
       } else {
         const isITBA = checkIsITBA(currentTeacher);
-        if (isITBA) {
-          const hasNonCore = sortedSlots.some(slot => {
-            return slot.items.some(item => {
+        const hasSupervisingSlot = sortedSlots.some(slot => {
+          return slot.items.some(item => {
+            const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === currentTeacher.nama.trim().toLowerCase();
+            if (isITBA) {
               return !isITBACoreSubject(item.mapel, currentTeacher.nama);
-            });
+            } else {
+              const isSupervisingCol = item.selainguru1_mengawas && (item.selainguru1_mengawas.trim().toLowerCase() === "yes" || item.selainguru1_mengawas.trim().toLowerCase() === "ya");
+              return !isGuru1 && isSupervisingCol;
+            }
           });
+        });
 
-          if (hasNonCore) {
-            roleType = "Pendamping Guru Mapel";
-          }
+        if (hasSupervisingSlot) {
+          roleType = "Pendamping Guru Mapel";
         }
       }
 
