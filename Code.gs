@@ -124,6 +124,170 @@ function doPost(e) {
     const ss = getSpreadsheet();
     const postData = JSON.parse(e.postData.contents);
     
+    // Check if this is an action request (such as delete)
+    if (postData && typeof postData === "object" && !Array.isArray(postData) && postData.action) {
+      if (postData.action === "delete") {
+        const sheet = ss.getSheetByName("Log_Izin");
+        if (!sheet) {
+          throw new Error("Sheet Log_Izin tidak ditemukan!");
+        }
+        
+        const logId = postData.id;
+        const targetTanggal = postData.tanggal;
+        const targetJamKe = Number(postData.jam_ke);
+        const targetGuruIzin = postData.guru_izin;
+        const targetKelas = postData.kelas;
+        
+        let deleted = false;
+        let rowToDelete = -1;
+        
+        // Helper to parse dates robustly in GAS
+        const parseDateToYYYYMMDD = function(val) {
+          if (!val) return "";
+          if (val instanceof Date) {
+            const year = val.getFullYear();
+            const month = String(val.getMonth() + 1).padStart(2, '0');
+            const day = String(val.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+          const str = val.toString().trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            return str;
+          }
+          const parts = str.split(/[-\/]/);
+          if (parts.length === 3) {
+            if (parts[0].length === 4) {
+              return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            } else if (parts[2].length === 4) {
+              return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+          }
+          try {
+            const d = new Date(str);
+            if (!isNaN(d.getTime())) {
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+          } catch (e) {}
+          return str;
+        };
+
+        // Try to find by ID row index first as an optimization
+        if (logId && logId.startsWith("Log_Izin_")) {
+          const suffix = parseInt(logId.split("_").pop(), 10);
+          if (!isNaN(suffix)) {
+            const possibleRow = suffix + 1;
+            if (possibleRow > 1 && possibleRow <= sheet.getLastRow()) {
+              const rowValues = sheet.getRange(possibleRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+              const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+              
+              // Verify it matches
+              let matchCount = 0;
+              let fieldsToCheck = 0;
+              
+              headers.forEach((header, index) => {
+                const key = header.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+                const val = rowValues[index];
+                
+                if (key === "tanggal" && targetTanggal) {
+                  fieldsToCheck++;
+                  const valStr = parseDateToYYYYMMDD(val);
+                  const targetStr = parseDateToYYYYMMDD(targetTanggal);
+                  if (valStr && valStr === targetStr) {
+                    matchCount++;
+                  }
+                } else if ((key === "jamke" || key === "jam_ke") && targetJamKe) {
+                  fieldsToCheck++;
+                  if (Number(val) === targetJamKe) {
+                    matchCount++;
+                  }
+                } else if ((key === "guruizin" || key === "guru_izin") && targetGuruIzin) {
+                  fieldsToCheck++;
+                  if (val && val.toString().trim().toLowerCase() === targetGuruIzin.toString().trim().toLowerCase()) {
+                    matchCount++;
+                  }
+                } else if (key === "kelas" && targetKelas) {
+                  fieldsToCheck++;
+                  if (val && val.toString().trim().toLowerCase() === targetKelas.toString().trim().toLowerCase()) {
+                    matchCount++;
+                  }
+                }
+              });
+              
+              if (matchCount >= Math.min(fieldsToCheck, 3) && fieldsToCheck > 0) {
+                rowToDelete = possibleRow;
+              }
+            }
+          }
+        }
+        
+        // If not found by row index verify, search the entire sheet
+        if (rowToDelete === -1) {
+          const lastRow = sheet.getLastRow();
+          if (lastRow >= 2) {
+            const values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+            const headers = values[0];
+            
+            for (let r = 1; r < values.length; r++) {
+              const rowValues = values[r];
+              let matchCount = 0;
+              let fieldsToCheck = 0;
+              
+              headers.forEach((header, index) => {
+                const key = header.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+                const val = rowValues[index];
+                
+                if (key === "tanggal" && targetTanggal) {
+                  fieldsToCheck++;
+                  const valStr = parseDateToYYYYMMDD(val);
+                  const targetStr = parseDateToYYYYMMDD(targetTanggal);
+                  if (valStr && valStr === targetStr) {
+                    matchCount++;
+                  }
+                } else if ((key === "jamke" || key === "jam_ke") && targetJamKe) {
+                  fieldsToCheck++;
+                  if (Number(val) === targetJamKe) {
+                    matchCount++;
+                  }
+                } else if ((key === "guruizin" || key === "guru_izin") && targetGuruIzin) {
+                  fieldsToCheck++;
+                  if (val && val.toString().trim().toLowerCase() === targetGuruIzin.toString().trim().toLowerCase()) {
+                    matchCount++;
+                  }
+                } else if (key === "kelas" && targetKelas) {
+                  fieldsToCheck++;
+                  if (val && val.toString().trim().toLowerCase() === targetKelas.toString().trim().toLowerCase()) {
+                    matchCount++;
+                  }
+                }
+              });
+              
+              if (matchCount >= Math.min(fieldsToCheck, 3) && fieldsToCheck > 0) {
+                rowToDelete = r + 1;
+                break; // Found the first matching row
+              }
+            }
+          }
+        }
+        
+        if (rowToDelete !== -1) {
+          sheet.deleteRow(rowToDelete);
+          deleted = true;
+        }
+        
+        if (deleted) {
+          return ContentService.createTextOutput(JSON.stringify({
+            status: "success",
+            message: "Log berhasil dihapus dari Google Sheets!"
+          })).setMimeType(ContentService.MimeType.JSON);
+        } else {
+          throw new Error("Catatan log tidak ditemukan di Google Sheets untuk dihapus.");
+        }
+      }
+    }
+
     // Default: Log_Izin appending (legacy behavior)
     const sheet = ss.getSheetByName("Log_Izin");
     if (!sheet) {

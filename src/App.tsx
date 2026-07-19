@@ -113,6 +113,31 @@ export default function App() {
 
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
 
+  // Custom Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {}
+  });
+
+  const triggerConfirm = (title: string, message: string, onConfirmCallback: () => void) => {
+    setConfirmDialog({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirmCallback();
+        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
   // --- INITIAL LOAD & PERSISTENCE ---
   useEffect(() => {
     // 1. Load lists from localStorage or fall back to mock data
@@ -321,7 +346,40 @@ export default function App() {
 
         saveTeachers(mappedTeachers);
         saveSchedules(jadwal);
-        saveLogs(logIzin);
+        
+        // Map Log_Izin to ensure they have correct, unique IDs and types mapped from the spreadsheet rows
+        const mappedLogIzin = logIzin.map((log: any, index: number) => {
+          let tanggalStr = "";
+          if (log.tanggal) {
+            try {
+              const d = new Date(log.tanggal);
+              if (!isNaN(d.getTime())) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                tanggalStr = `${year}-${month}-${day}`;
+              } else {
+                tanggalStr = String(log.tanggal).trim().split("T")[0];
+              }
+            } catch (e) {
+              tanggalStr = String(log.tanggal).trim().split("T")[0];
+            }
+          }
+
+          return {
+            id: log.id || `Log_Izin_${index + 1}`,
+            tanggal: tanggalStr || log.tanggal || "",
+            guru_izin: String(log.guru_izin || "").trim(),
+            alasan: String(log.alasan || "").trim(),
+            jam_ke: Number(log.jam_ke || 0),
+            kelas: String(log.kelas || "").trim(),
+            mapel: String(log.mapel || "").trim(),
+            guru_pengganti: String(log.guru_pengganti || "").trim(),
+            created_at: log.created_at || new Date().toISOString()
+          };
+        });
+
+        saveLogs(mappedLogIzin);
 
         if (data.akun && Array.isArray(data.akun)) {
           setAccounts(data.akun);
@@ -365,16 +423,19 @@ export default function App() {
 
   // Reset local database back to default initial mock data
   const handleResetLocalDB = () => {
-    if (window.confirm("Apakah Anda yakin ingin menyetel ulang seluruh database ke data bawaan sekolah?")) {
-      saveTeachers(INITIAL_TEACHERS);
-      saveSchedules(INITIAL_SCHEDULES);
-      saveLogs(INITIAL_LOGS);
-      setSelectedTeacher("");
-      setApiUrl("");
-      setApiConnected(false);
-      localStorage.removeItem("db_api_url");
-      alert("Database sekolah berhasil disetel ulang!");
-    }
+    triggerConfirm(
+      "Setel Ulang Database",
+      "Apakah Anda yakin ingin menyetel ulang seluruh database ke data bawaan sekolah? Tindakan ini akan menghapus semua log kustom, jadwal kustom, daftar guru, serta tautan Google Apps Script yang tersimpan.",
+      () => {
+        saveTeachers(INITIAL_TEACHERS);
+        saveSchedules(INITIAL_SCHEDULES);
+        saveLogs(INITIAL_LOGS);
+        setSelectedTeacher("");
+        setApiUrl("");
+        setApiConnected(false);
+        localStorage.removeItem("db_api_url");
+      }
+    );
   };
 
   // Add substitution logs generated from the form
@@ -400,23 +461,86 @@ export default function App() {
           body: JSON.stringify(createdLogs)
         });
         if (response.ok) {
-          console.log("Sync to Apps Script successful!");
-          fetchFromAppsScript(apiUrl);
+          try {
+            const resData = await response.json();
+            if (resData && resData.status === "success") {
+              console.log("Sync to Apps Script successful:", resData.message);
+              fetchFromAppsScript(apiUrl);
+            } else {
+              const errMsg = resData?.message || "Gagal menyimpan log baru ke Google Sheets.";
+              console.warn("Apps Script sync failed:", errMsg);
+            }
+          } catch (jsonErr) {
+            // Sometimes GAS redirects trigger JSON parsing or CORS blocks even though the data was appended
+            console.log("Response parsed with warning (GAS redirect expected):", jsonErr);
+            fetchFromAppsScript(apiUrl);
+          }
         } else {
           console.warn("Failed to sync with Apps Script:", response.statusText);
         }
-      } catch (err) {
-        console.error("Error syncing log to Apps Script:", err);
+      } catch (err: any) {
+        // Log to console instead of throwing an annoying alert, because GAS often returns CORS errors on redirect
+        // but successfully appends the data anyway.
+        console.warn("Network notice during Apps Script sync (the action likely succeeded on Google Sheets):", err);
+        // Refresh to check if it succeeded
+        setTimeout(() => fetchFromAppsScript(apiUrl), 1500);
       }
     }
   };
 
   // Delete log item
   const handleDeleteLog = (id: string) => {
-    if (window.confirm("Hapus catatan log guru pengganti ini?")) {
-      const updated = logs.filter(l => l.id !== id);
-      saveLogs(updated);
-    }
+    triggerConfirm(
+      "Hapus Catatan Log",
+      "Apakah Anda yakin ingin menghapus catatan log guru pengganti ini? Catatan yang dipilih akan langsung dihapus dari sistem.",
+      async () => {
+        const logToDelete = logs.find(l => l.id === id);
+        const updated = logs.filter(l => l.id !== id);
+        saveLogs(updated);
+
+        if (apiConnected && apiUrl && logToDelete) {
+          try {
+            console.log("Sending delete action to Apps Script DB:", logToDelete);
+            const response = await fetch(apiUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "text/plain;charset=utf-8" // Plain text to avoid preflight issues in GAS
+              },
+              body: JSON.stringify({
+                action: "delete",
+                id: logToDelete.id,
+                tanggal: logToDelete.tanggal,
+                jam_ke: logToDelete.jam_ke,
+                guru_izin: logToDelete.guru_izin,
+                kelas: logToDelete.kelas
+              })
+            });
+            if (response.ok) {
+              try {
+                const resData = await response.json();
+                if (resData && resData.status === "success") {
+                  console.log("Delete sync to Apps Script successful:", resData.message);
+                  fetchFromAppsScript(apiUrl);
+                } else {
+                  const errMsg = resData?.message || "Gagal menghapus log dari Google Sheets.";
+                  console.warn("Apps Script delete failed:", errMsg);
+                }
+              } catch (jsonErr) {
+                console.log("Delete response parsed with warning (GAS redirect expected):", jsonErr);
+                fetchFromAppsScript(apiUrl);
+              }
+            } else {
+              console.warn("Failed to delete from Apps Script:", response.statusText);
+            }
+          } catch (err: any) {
+            // Log to console instead of rolling back or throwing alert
+            console.warn("Network notice during Apps Script delete (the row was likely deleted on Google Sheets):", err);
+            // Refresh to sync up
+            setTimeout(() => fetchFromAppsScript(apiUrl), 1500);
+          }
+        }
+      }
+    );
   };
 
   const filteredHeaderTeachers = headerSearch.trim() === ""
@@ -1136,6 +1260,42 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-100 max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">{confirmDialog.title}</h3>
+                <p className="text-slate-500 text-xs mt-1.5 leading-relaxed">
+                  {confirmDialog.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                id="confirm-cancel-btn"
+                onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                className="px-3.5 py-2 hover:bg-slate-100 text-slate-600 font-semibold text-xs rounded-xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                id="confirm-ok-btn"
+                onClick={confirmDialog.onConfirm}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm"
+              >
+                Ya, Lanjutkan
+              </button>
+            </div>
           </div>
         </div>
       )}
