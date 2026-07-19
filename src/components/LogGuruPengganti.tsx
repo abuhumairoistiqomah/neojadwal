@@ -81,7 +81,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       let section = `*${guruIzin}* - ${alasan}\n`;
       
       logsList.forEach((log, index) => {
-        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*\n`;
+        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* - *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*\n`;
       });
       
       teacherSections.push(section.trimEnd());

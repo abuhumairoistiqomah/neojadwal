@@ -111,12 +111,19 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
     );
 
     const rows = selectedHours.map(hour => {
-      // Find matching schedule
-      const sched = teacherSchedules.find(s => s.jam_ke === hour);
+      // Find all matching schedules for this hour
+      const matchingScheds = teacherSchedules.filter(s => s.jam_ke === hour);
+      
+      const uniqueKelas = [...new Set(matchingScheds.map(s => s.kelas))].filter(Boolean);
+      const uniqueMapel = [...new Set(matchingScheds.map(s => s.mapel))].filter(Boolean);
+
+      const displayKelas = uniqueKelas.length > 0 ? uniqueKelas.join(" & ") : "X-MIPA-1";
+      const displayMapel = uniqueMapel.length > 0 ? uniqueMapel.join(" & ") : "Mata Pelajaran";
+
       return {
         jam_ke: hour,
-        kelas: sched ? sched.kelas : "X-MIPA-1", // default if none found, but prompt admin
-        mapel: sched ? sched.mapel : "Mata Pelajaran",
+        kelas: displayKelas,
+        mapel: displayMapel,
         selectedPengganti: "",
       };
     });
@@ -546,12 +553,50 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
                 {[1, 2, 3, 4, 5, 6].map((hour) => {
-                  // Count sessions taught by selected teacher to guide user
-                  const hasClassAtHour = schedules.some(
-                    s => isSameDay(s.hari, selectedDayName) && s.jam_ke === hour && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
-                      g => g && g.trim().toLowerCase() === guruIzin.trim().toLowerCase()
-                    )
-                  );
+                  let status: "free" | "mengajar" | "mendamping" = "free";
+                  let classText = "";
+
+                  if (guruIzin) {
+                    const targetTeacherObj = teachers.find(t => t.nama === guruIzin);
+                    const isITBA = targetTeacherObj ? checkIsITBA(targetTeacherObj) : false;
+
+                    const matchingScheds = schedules.filter(
+                      s => isSameDay(s.hari, selectedDayName) && s.jam_ke === hour && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+                        g => g && g.trim().toLowerCase() === guruIzin.trim().toLowerCase()
+                      )
+                    );
+
+                    if (matchingScheds.length > 0) {
+                      const uniqueKelas = [...new Set(matchingScheds.map(s => s.kelas))].filter(Boolean);
+                      classText = uniqueKelas.join(" & ");
+
+                      // Check if there is any schedule in matchingScheds where they are primary teaching (not just accompanying)
+                      const hasPrimaryTeaching = matchingScheds.some(s => {
+                        const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === guruIzin.trim().toLowerCase();
+                        if (isITBA) {
+                          return isITBACoreSubject(s.mapel, guruIzin);
+                        }
+                        return isGuru1;
+                      });
+
+                      if (hasPrimaryTeaching) {
+                        status = "mengajar";
+                      } else {
+                        status = "mendamping";
+                      }
+                    }
+                  }
+
+                  let statusLabel = "× Free";
+                  let statusClass = "text-gray-300 italic";
+
+                  if (status === "mengajar") {
+                    statusLabel = `✓ Mengajar${classText ? ` (${classText})` : ""}`;
+                    statusClass = "text-indigo-600";
+                  } else if (status === "mendamping") {
+                    statusLabel = `× Pendamping${classText ? ` (${classText})` : ""}`;
+                    statusClass = "text-gray-400 font-medium italic";
+                  }
 
                   return (
                     <label 
@@ -576,8 +621,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                         />
                       </div>
                       {guruIzin && (
-                        <span className={`text-[9px] mt-1.5 font-bold ${hasClassAtHour ? "text-indigo-600" : "text-gray-300 italic"}`}>
-                          {hasClassAtHour ? "✓ Mengajar" : "× Free"}
+                        <span className={`text-[9px] mt-1.5 font-bold ${statusClass}`}>
+                          {statusLabel}
                         </span>
                       )}
                     </label>
