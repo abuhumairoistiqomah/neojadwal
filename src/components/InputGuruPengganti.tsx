@@ -177,7 +177,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       });
 
       if (isBusy) {
-        return { teacher: candidate, eligible: false, score: -999, reasons: ["Sedang mengajar kelas reguler"] };
+        return { teacher: candidate, eligible: false, isPendamping: false, score: -999, reasons: ["Sedang mengajar kelas reguler"] };
       }
 
       // b. SYARAT MUTLAK 2: Guru tidak sedang menjadi pengganti di kelas lain (Cek data Log_Izin di hari/jam yang sama).
@@ -185,7 +185,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         log => log.tanggal === tanggal && log.jam_ke === jam_ke && log.guru_pengganti === candidate.nama
       );
       if (isAlreadySubbing) {
-        return { teacher: candidate, eligible: false, score: -999, reasons: ["Sudah ditunjuk sebagai inval di kelas lain"] };
+        return { teacher: candidate, eligible: false, isPendamping: false, score: -999, reasons: ["Sudah ditunjuk sebagai inval di kelas lain"] };
       }
 
       // c. Prioritas 1: Semapel (Mapel sama).
@@ -242,18 +242,44 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         }
       }
 
+      // Check if they are currently assigned as a companion in this slot
+      const isPendamping = schedules.some(s => {
+        if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
+        
+        const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
+        const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+          g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+        );
+        
+        if (!isGuru1 && !isAssisting) return false;
+        
+        if (isITBA) {
+          return !isITBACoreSubject(s.mapel, candidate.nama);
+        } else {
+          const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
+          return !isGuru1 && isSupervisingCol;
+        }
+      });
+
       return {
         teacher: candidate,
         eligible: true,
+        isPendamping,
         score,
         reasons
       };
     });
 
-    // Filter only eligible, and sort descending by score
-    return scoredCandidates
+    // Separate and sort candidates
+    const eligibleList = scoredCandidates
       .filter(c => c.eligible)
       .sort((a, b) => b.score - a.score);
+      
+    const ineligibleList = scoredCandidates
+      .filter(c => !c.eligible)
+      .sort((a, b) => a.teacher.nama.localeCompare(b.teacher.nama));
+      
+    return [...eligibleList, ...ineligibleList];
   };
 
   // Handle individual replacement selection
@@ -637,8 +663,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                           <option value="">-- Pilih Guru Pengganti --</option>
                           
                           {/* Ranked Recommendations */}
-                          <optgroup label="✨ REKOMENDASI TERBAIK (JAM KOSONG & KOMPATIBEL) ✨">
-                            {recommendations.map(candidate => {
+                          <optgroup label="✨ REKOMENDASI TERBAIK (JAM KOSONG / PENDAMPING) ✨">
+                            {recommendations.filter(c => c.eligible).map(candidate => {
                               const score = candidate.score;
                               const badge = score >= 100 
                                 ? "★ Semapel" 
@@ -646,12 +672,29 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                   ? "✦ Serumpun" 
                                   : "Sejenjang";
 
+                              const labelPendamping = candidate.isPendamping ? " (PENDAMPING)" : "";
+
                               return (
                                 <option 
                                   key={candidate.teacher.nama} 
                                   value={candidate.teacher.nama}
                                 >
-                                  {candidate.teacher.nama} [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | {badge})
+                                  {candidate.teacher.nama}{labelPendamping} [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | {badge})
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+
+                          {/* Ineligible / Busy Teachers (Override) */}
+                          <optgroup label="⚠️ GURU SEDANG MENGAJAR / BERTUGAS LAIN (OVERRIDE) ⚠️">
+                            {recommendations.filter(c => !c.eligible).map(candidate => {
+                              const reasons = candidate.reasons.join(", ");
+                              return (
+                                <option 
+                                  key={candidate.teacher.nama} 
+                                  value={candidate.teacher.nama}
+                                >
+                                  {candidate.teacher.nama} [{reasons}] [Mapel: {candidate.teacher.mapel_utama}]
                                 </option>
                               );
                             })}

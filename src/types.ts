@@ -95,7 +95,9 @@ export function checkIsITBA(teacher: Teacher | undefined): boolean {
     name.includes("ITBA") || 
     tugas.includes("ITBA") || 
     ket.includes("ITBA") ||
-    mapel.includes("ITBA")
+    mapel.includes("ITBA") ||
+    name.includes("KHOLID") ||
+    name.includes("HARIYADI")
   );
 }
 
