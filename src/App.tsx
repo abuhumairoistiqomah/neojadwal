@@ -961,7 +961,20 @@ export default function App() {
             </p>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-600">Web App API URL</label>
+              <div className="flex justify-between items-center">
+                <label className="block text-xs font-bold text-slate-600">Web App API URL</label>
+                <button
+                  id="reset-to-default-api-btn"
+                  type="button"
+                  onClick={() => {
+                    setApiUrl(DEFAULT_API_URL);
+                    localStorage.setItem("db_api_url", DEFAULT_API_URL);
+                  }}
+                  className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline transition-all"
+                >
+                  Gunakan URL Default Baru
+                </button>
+              </div>
               <input
                 id="api-url-input"
                 type="url"
