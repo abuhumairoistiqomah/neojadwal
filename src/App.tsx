@@ -80,7 +80,7 @@ export default function App() {
   const headerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   // Google Apps Script API configuration
-  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbyimCptRKiJRqP5HjdTLCbWjNHPdr6mJ3iotPsY94-H_S5rl67AZeD0TqzSb8ZaGviQ7g/exec";
+  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbyFzDIDUnJV5x3qCtOu5B7iW5ZsLTB7Dv4RWB-2mh3LqEhCN9ePlEG6TiVMUSck1blZag/exec";
   const [apiUrl, setApiUrl] = useState<string>(() => {
     const val = localStorage.getItem("db_api_url");
     const oldDefaults = [
@@ -88,7 +88,8 @@ export default function App() {
       "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
       "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
       "https://script.google.com/macros/s/AKfycbyqmK6N1Fzkm5irhbYKrA3knrOKllh8Acd4aYDkRD96pn6uGYCW7pFRjxNs-pvM13phSA/exec",
-      "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec"
+      "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec",
+      "https://script.google.com/macros/s/AKfycbyimCptRKiJRqP5HjdTLCbWjNHPdr6mJ3iotPsY94-H_S5rl67AZeD0TqzSb8ZaGviQ7g/exec"
     ];
     if (val === null || oldDefaults.includes(val)) {
       localStorage.setItem("db_api_url", DEFAULT_API_URL);
@@ -103,7 +104,8 @@ export default function App() {
       "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
       "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
       "https://script.google.com/macros/s/AKfycbyqmK6N1Fzkm5irhbYKrA3knrOKllh8Acd4aYDkRD96pn6uGYCW7pFRjxNs-pvM13phSA/exec",
-      "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec"
+      "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec",
+      "https://script.google.com/macros/s/AKfycbyimCptRKiJRqP5HjdTLCbWjNHPdr6mJ3iotPsY94-H_S5rl67AZeD0TqzSb8ZaGviQ7g/exec"
     ];
     if (val === null || oldDefaults.includes(val)) return true;
     return val !== "";
@@ -151,7 +153,8 @@ export default function App() {
       "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
       "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
       "https://script.google.com/macros/s/AKfycbyqmK6N1Fzkm5irhbYKrA3knrOKllh8Acd4aYDkRD96pn6uGYCW7pFRjxNs-pvM13phSA/exec",
-      "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec"
+      "https://script.google.com/macros/s/AKfycbxr3Q2tdS8izTiXX4DNjaKapcRBNCPzdH9ETro9PeK_kt1pdkiL773lzm65zpopqMkXNQ/exec",
+      "https://script.google.com/macros/s/AKfycbyimCptRKiJRqP5HjdTLCbWjNHPdr6mJ3iotPsY94-H_S5rl67AZeD0TqzSb8ZaGviQ7g/exec"
     ];
     if (storedApiUrl === null || oldDefaults.includes(storedApiUrl)) {
       storedApiUrl = DEFAULT_API_URL;
