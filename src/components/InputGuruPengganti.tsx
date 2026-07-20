@@ -132,7 +132,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
   };
 
   // ALGORITMA REKOMENDASI PENGGANTI (Sangat Penting)
-  const getRecommendedTeachers = (jam_ke: number, classLabel: string, subjectLabel: string) => {
+  const getRecommendedTeachers = (jam_ke: number, classLabel: string, subjectLabel: string, currentRowIndex?: number) => {
     if (!guruIzin) return [];
 
     const targetTeacher = teachers.find(t => t.nama === guruIzin);
@@ -162,7 +162,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       // Khusus Kholid dan Hariyadiq juga sibuk jika mengajar PE. Di luar itu (misal mendampingi Bahasa Inggris), mereka dianggap kosong/bisa digantikan.
       const isITBA = checkIsITBA(candidate);
       
-      const jpCount = schedules.filter(s => {
+      const regularJpCount = schedules.filter(s => {
         if (!isSameDay(s.hari, selectedDayName)) return false;
         const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
         const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
@@ -170,6 +170,19 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         );
         return isGuru1 || isAssisting;
       }).length;
+
+      const savedSubstituteJpCount = logs.filter(log => 
+        log.tanggal === tanggal && 
+        log.guru_pengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+      ).length;
+
+      const currentFormSubstituteJpCount = generatedRows.filter((r, rIdx) => 
+        (currentRowIndex !== undefined ? rIdx !== currentRowIndex : r.jam_ke !== jam_ke) &&
+        r.selectedPengganti && 
+        r.selectedPengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+      ).length;
+
+      const totalJpCount = regularJpCount + savedSubstituteJpCount + currentFormSubstituteJpCount;
 
       const isPendampingOnDay = schedules.some(s => {
         if (!isSameDay(s.hari, selectedDayName)) return false;
@@ -223,7 +236,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
           eligible: false, 
           isPendamping: false, 
           isPendampingOnDay,
-          jpCount,
+          jpCount: totalJpCount,
           score: -999, 
           reasons: ["Sedang mengajar kelas reguler"] 
         };
@@ -239,7 +252,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
           eligible: false, 
           isPendamping: false, 
           isPendampingOnDay,
-          jpCount,
+          jpCount: totalJpCount,
           score: -999, 
           reasons: ["Sudah ditunjuk sebagai inval di kelas lain"] 
         };
@@ -300,9 +313,9 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       }
 
       // Rule 1: Beban mengajar lebih dari 5 JP pada hari tersebut diletakkan di bawah (tidak direkomendasikan)
-      if (jpCount > 5) {
+      if (totalJpCount > 5) {
         score -= 150;
-        reasons.push(`Beban mengajar tinggi: ${jpCount} JP hari ini (-150)`);
+        reasons.push(`Beban mengajar tinggi: ${totalJpCount} JP hari ini (-150)`);
       }
 
       // Rule 2: Guru ITBA selain yang statusnya pendamping pada hari tersebut diletakkan di tengah (tidak diprioritaskan)
@@ -335,7 +348,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         eligible: true,
         isPendamping,
         isPendampingOnDay,
-        jpCount,
+        jpCount: totalJpCount,
         score,
         reasons
       };
@@ -733,7 +746,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
               <div className="space-y-4">
                 {generatedRows.map((row, index) => {
                   // Get candidates recommendation ranking
-                  const recommendations = getRecommendedTeachers(row.jam_ke, row.kelas, row.mapel);
+                  const recommendations = getRecommendedTeachers(row.jam_ke, row.kelas, row.mapel, index);
 
                   return (
                     <div 
