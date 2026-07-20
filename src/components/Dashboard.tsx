@@ -284,6 +284,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 const isPendampingSlot = item.items.some(scItem => {
                   const isGuru1 = scItem.guru1 && scItem.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
                   if (isITBA) {
+                    const sName = (scItem.mapel || "").trim().toLowerCase();
+                    const isArabic = 
+                      sName.includes("arabic") || 
+                      sName.includes("bahasa arab") || 
+                      sName.includes("arab") || 
+                      sName.includes("b. arab") || 
+                      sName.includes("b.arab");
+                    if (isArabic) {
+                      return !isGuru1;
+                    }
                     return !isITBACoreSubject(scItem.mapel, selectedTeacher);
                   } else {
                     const isSupervisingCol = scItem.selainguru1_mengawas && (scItem.selainguru1_mengawas.trim().toLowerCase() === "yes" || scItem.selainguru1_mengawas.trim().toLowerCase() === "ya");

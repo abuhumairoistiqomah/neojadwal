@@ -162,6 +162,40 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       // Khusus Kholid dan Hariyadiq juga sibuk jika mengajar PE. Di luar itu (misal mendampingi Bahasa Inggris), mereka dianggap kosong/bisa digantikan.
       const isITBA = checkIsITBA(candidate);
       
+      const jpCount = schedules.filter(s => {
+        if (!isSameDay(s.hari, selectedDayName)) return false;
+        const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
+        const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+          g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+        );
+        return isGuru1 || isAssisting;
+      }).length;
+
+      const isPendampingOnDay = schedules.some(s => {
+        if (!isSameDay(s.hari, selectedDayName)) return false;
+        const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
+        const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+          g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+        );
+        if (!isGuru1 && !isAssisting) return false;
+        if (isITBA) {
+          const sName = (s.mapel || "").trim().toLowerCase();
+          const isArabic = 
+            sName.includes("arabic") || 
+            sName.includes("bahasa arab") || 
+            sName.includes("arab") || 
+            sName.includes("b. arab") || 
+            sName.includes("b.arab");
+          if (isArabic) {
+            return !isGuru1;
+          }
+          return !isITBACoreSubject(s.mapel, candidate.nama);
+        } else {
+          const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
+          return !isGuru1 && isSupervisingCol;
+        }
+      });
+      
       const isBusy = schedules.some(s => {
         if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
         
@@ -184,7 +218,15 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       });
 
       if (isBusy) {
-        return { teacher: candidate, eligible: false, isPendamping: false, score: -999, reasons: ["Sedang mengajar kelas reguler"] };
+        return { 
+          teacher: candidate, 
+          eligible: false, 
+          isPendamping: false, 
+          isPendampingOnDay,
+          jpCount,
+          score: -999, 
+          reasons: ["Sedang mengajar kelas reguler"] 
+        };
       }
 
       // b. SYARAT MUTLAK 2: Guru tidak sedang menjadi pengganti di kelas lain (Cek data Log_Izin di hari/jam yang sama).
@@ -192,7 +234,15 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         log => log.tanggal === tanggal && log.jam_ke === jam_ke && log.guru_pengganti === candidate.nama
       );
       if (isAlreadySubbing) {
-        return { teacher: candidate, eligible: false, isPendamping: false, score: -999, reasons: ["Sudah ditunjuk sebagai inval di kelas lain"] };
+        return { 
+          teacher: candidate, 
+          eligible: false, 
+          isPendamping: false, 
+          isPendampingOnDay,
+          jpCount,
+          score: -999, 
+          reasons: ["Sudah ditunjuk sebagai inval di kelas lain"] 
+        };
       }
 
       // c. Prioritas 1: Semapel (Mapel sama).
@@ -249,6 +299,18 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         }
       }
 
+      // Rule 1: Beban mengajar lebih dari 5 JP pada hari tersebut diletakkan di bawah (tidak direkomendasikan)
+      if (jpCount > 5) {
+        score -= 150;
+        reasons.push(`Beban mengajar tinggi: ${jpCount} JP hari ini (-150)`);
+      }
+
+      // Rule 2: Guru ITBA selain yang statusnya pendamping pada hari tersebut diletakkan di tengah (tidak diprioritaskan)
+      if (isITBA && !isPendampingOnDay) {
+        score -= 50;
+        reasons.push("Mahasiswa ITBA bukan pendamping hari ini (-50)");
+      }
+
       // Check if they are currently assigned as a companion in this slot
       const isPendamping = schedules.some(s => {
         if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
@@ -272,6 +334,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         teacher: candidate,
         eligible: true,
         isPendamping,
+        isPendampingOnDay,
+        jpCount,
         score,
         reasons
       };
@@ -707,31 +771,67 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                         >
                           <option value="">-- Pilih Guru Pengganti --</option>
                           
-                          {/* Ranked Recommendations */}
-                          <optgroup label="✨ REKOMENDASI TERBAIK (JAM KOSONG / PENDAMPING) ✨">
-                            {recommendations.filter(c => c.eligible).map(candidate => {
-                              const score = candidate.score;
-                              const badge = score >= 100 
-                                ? "★ Semapel" 
-                                : score >= 50 
-                                  ? "✦ Serumpun" 
-                                  : "Sejenjang";
+                           {/* 1. Best Recommendations */}
+                          <optgroup label="✨ REKOMENDASI TERBAIK (JAM KOSONG & PENDAMPING HARI INI) ✨">
+                            {recommendations
+                              .filter(c => c.eligible && c.jpCount <= 5 && !(checkIsITBA(c.teacher) && !c.isPendampingOnDay))
+                              .map(candidate => {
+                                const score = candidate.score;
+                                const badge = score >= 100 
+                                  ? "★ Semapel" 
+                                  : score >= 50 
+                                    ? "✦ Serumpun" 
+                                    : "Sejenjang";
 
-                              const labelPendamping = candidate.isPendamping ? " (PENDAMPING)" : "";
+                                const labelPendamping = candidate.isPendamping ? " (PENDAMPING)" : "";
 
-                              return (
-                                <option 
-                                  key={candidate.teacher.nama} 
-                                  value={candidate.teacher.nama}
-                                >
-                                  {candidate.teacher.nama}{labelPendamping} [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | {badge})
-                                </option>
-                              );
-                            })}
+                                return (
+                                  <option 
+                                    key={candidate.teacher.nama} 
+                                    value={candidate.teacher.nama}
+                                  >
+                                    {candidate.teacher.nama}{labelPendamping} [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | {badge} | Beban: {candidate.jpCount} JP)
+                                  </option>
+                                );
+                              })}
                           </optgroup>
 
-                          {/* Ineligible / Busy Teachers (Override) */}
-                          <optgroup label="⚠️ GURU SEDANG MENGAJAR / BERTUGAS LAIN (OVERRIDE) ⚠️">
+                          {/* 2. ITBA Non-companion Today */}
+                          <optgroup label="⚠️ TIDAK DIPRIORITASKAN (MAHASISWA ITBA BUKAN PENDAMPING HARI INI) ⚠️">
+                            {recommendations
+                              .filter(c => c.eligible && c.jpCount <= 5 && (checkIsITBA(c.teacher) && !c.isPendampingOnDay))
+                              .map(candidate => {
+                                const score = candidate.score;
+                                return (
+                                  <option 
+                                    key={candidate.teacher.nama} 
+                                    value={candidate.teacher.nama}
+                                  >
+                                    {candidate.teacher.nama} (MAHASISWA ITBA - BUKAN PENDAMPING) [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | Beban: {candidate.jpCount} JP)
+                                  </option>
+                                );
+                              })}
+                          </optgroup>
+
+                          {/* 3. Teaching workload > 5 JP Today */}
+                          <optgroup label="🚫 TIDAK DIREKOMENDASIKAN (BEBAN MENGAJAR > 5 JP HARI INI) 🚫">
+                            {recommendations
+                              .filter(c => c.eligible && c.jpCount > 5)
+                              .map(candidate => {
+                                const score = candidate.score;
+                                return (
+                                  <option 
+                                    key={candidate.teacher.nama} 
+                                    value={candidate.teacher.nama}
+                                  >
+                                    {candidate.teacher.nama} (BEBAN TINGGI - MENGAJAR {candidate.jpCount} JP) [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score})
+                                  </option>
+                                );
+                              })}
+                          </optgroup>
+
+                          {/* 4. Ineligible / Busy Teachers (Override) */}
+                          <optgroup label="🔒 GURU SEDANG MENGAJAR / BERTUGAS LAIN (OVERRIDE) 🔒">
                             {recommendations.filter(c => !c.eligible).map(candidate => {
                               const reasons = candidate.reasons.join(", ");
                               return (
@@ -739,7 +839,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                   key={candidate.teacher.nama} 
                                   value={candidate.teacher.nama}
                                 >
-                                  {candidate.teacher.nama} [{reasons}] [Mapel: {candidate.teacher.mapel_utama}]
+                                  {candidate.teacher.nama} [{reasons}] [Mapel: {candidate.teacher.mapel_utama}] (Beban: {candidate.jpCount} JP)
                                 </option>
                               );
                             })}

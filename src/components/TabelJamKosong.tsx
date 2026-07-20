@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, isSameDay } from "../types";
+import { Teacher, ScheduleItem, isSameDay, checkIsITBA, isITBACoreSubject } from "../types";
 import { 
   ArrowLeft, Table, Calendar, CheckCircle2, XCircle, Search, 
   BookOpen, Clock, AlertCircle, Sparkles
@@ -226,6 +226,12 @@ export const TabelJamKosong: React.FC<TabelJamKosongProps> = ({
               </div>
               <span><strong>Merah (✗): Mengajar</strong> (Menampilkan Kelas & Mapel)</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-purple-100 border border-purple-200 text-purple-800 rounded flex items-center justify-center text-[10px] font-bold">
+                ?
+              </div>
+              <span><strong>Ungu (?): Pendamping</strong> (Sebagai pendamping guru mapel)</span>
+            </div>
           </div>
         </div>
 
@@ -285,9 +291,53 @@ export const TabelJamKosong: React.FC<TabelJamKosongProps> = ({
                             </td>
                           );
                         } else {
+                          const isITBA = checkIsITBA(teacher);
+                          const isPendamping = slots.some(item => {
+                            const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === teacher.nama.trim().toLowerCase();
+                            if (isITBA) {
+                              const sName = (item.mapel || "").trim().toLowerCase();
+                              const isArabic = 
+                                sName.includes("arabic") || 
+                                sName.includes("bahasa arab") || 
+                                sName.includes("arab") || 
+                                sName.includes("b. arab") || 
+                                sName.includes("b.arab");
+                              if (isArabic) {
+                                return !isGuru1;
+                              }
+                              return !isITBACoreSubject(item.mapel, teacher.nama);
+                            } else {
+                              const isSupervisingCol = item.selainguru1_mengawas && (item.selainguru1_mengawas.trim().toLowerCase() === "yes" || item.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                              return !isGuru1 && isSupervisingCol;
+                            }
+                          });
+
                           // Compile description of what they are teaching
                           const mapels = [...new Set(slots.map(s => s.mapel))].join(" & ");
                           const classes = [...new Set(slots.map(s => s.kelas))].join(" & ");
+
+                          if (isPendamping) {
+                            return (
+                              <td 
+                                key={jam} 
+                                className="p-3 text-center border-l border-gray-100 bg-purple-50/50 hover:bg-purple-100/40 transition-colors"
+                              >
+                                <div className="flex flex-col items-center justify-center gap-1">
+                                  <span className="text-purple-700 bg-purple-100/80 border border-purple-200/50 w-6 h-6 rounded-full flex items-center justify-center font-extrabold text-sm shadow-xs">
+                                    ?
+                                  </span>
+                                  <div className="text-center leading-tight">
+                                    <div className="text-[10px] font-extrabold text-purple-900 truncate max-w-[110px]" title={mapels}>
+                                      {mapels}
+                                    </div>
+                                    <div className="text-[9px] font-semibold text-purple-700/80 mt-0.5 bg-purple-100/40 px-1 py-0.5 rounded border border-purple-200/30 inline-block">
+                                      Pendamping ({classes})
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          }
 
                           return (
                             <td 
@@ -370,7 +420,42 @@ export const TabelJamKosong: React.FC<TabelJamKosongProps> = ({
                             </div>
                           );
                         } else {
+                          const isITBA = checkIsITBA(teacher);
+                          const isPendamping = slots.some(item => {
+                            const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === teacher.nama.trim().toLowerCase();
+                            if (isITBA) {
+                              const sName = (item.mapel || "").trim().toLowerCase();
+                              const isArabic = 
+                                sName.includes("arabic") || 
+                                sName.includes("bahasa arab") || 
+                                sName.includes("arab") || 
+                                sName.includes("b. arab") || 
+                                sName.includes("b.arab");
+                              if (isArabic) {
+                                return !isGuru1;
+                              }
+                              return !isITBACoreSubject(item.mapel, teacher.nama);
+                            } else {
+                              const isSupervisingCol = item.selainguru1_mengawas && (item.selainguru1_mengawas.trim().toLowerCase() === "yes" || item.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                              return !isGuru1 && isSupervisingCol;
+                            }
+                          });
+
                           const classes = [...new Set(slots.map(s => s.kelas))].join("&");
+
+                          if (isPendamping) {
+                            return (
+                              <div key={jam} className="flex flex-col items-center justify-center py-1">
+                                <span className="text-purple-800 bg-purple-50 border border-purple-100 w-6 h-6 rounded-md flex items-center justify-center font-black text-xs">
+                                  ?
+                                </span>
+                                <span className="text-[8px] text-purple-600 font-extrabold mt-0.5 truncate max-w-[48px]" title={classes}>
+                                  Pndp {classes}
+                                </span>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div key={jam} className="flex flex-col items-center justify-center py-1">
                               <span className="text-red-800 bg-red-50 border border-red-100 w-6 h-6 rounded-md flex items-center justify-center font-black text-xs">
