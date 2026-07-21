@@ -1,4 +1,4 @@
-import { Teacher, ScheduleItem, LogIzinItem, AdminAccount } from "./types";
+import { Teacher, ScheduleItem, LogIzinItem, AdminAccount, JadwalInsidentalItem } from "./types";
 
 export const INITIAL_ACCOUNTS: AdminAccount[] = [
   { id: "admin", password: "admin", nama: "Administrator" },
@@ -353,5 +353,24 @@ export const INITIAL_LOGS: LogIzinItem[] = [
     kelas: "01 INTER 1",
     mapel: "Math",
     guru_pengganti: "ISTIQOMAH ASY SAYFULLOH, M.Pd"
+  }
+];
+
+export const INITIAL_INCIDENTALS: JadwalInsidentalItem[] = [
+  {
+    id: "inc1",
+    tanggal: "2026-07-21",
+    kelas: "01 INTER 1",
+    jam_ke: 3,
+    mapel: "Science Lab",
+    guru1: "ISTIQOMAH ASY SAYFULLOH, M.Pd",
+    guru2: "",
+    guru3: "",
+    guru4: "",
+    guru5: "",
+    guru6: "",
+    keterangan_khusus: "Lab IPA Lt. 2",
+    alasan: "Pindah Ruang Sementara",
+    tipe_insidental: "Pindah Ruang"
   }
 ];

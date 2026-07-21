@@ -43,6 +43,23 @@ export interface LogIzinItem {
   created_at?: string;
 }
 
+export interface JadwalInsidentalItem {
+  id: string;
+  tanggal: string; // YYYY-MM-DD
+  kelas: string;
+  jam_ke: number;
+  mapel: string;
+  guru1: string;
+  guru2: string;
+  guru3: string;
+  guru4: string;
+  guru5: string;
+  guru6: string;
+  keterangan_khusus?: string;
+  alasan?: string;
+  tipe_insidental?: string;
+}
+
 export interface AdminAccount {
   id: string;
   password: string;
@@ -66,6 +83,7 @@ export interface DBState {
   teachers: Teacher[];
   schedules: ScheduleItem[];
   logs: LogIzinItem[];
+  jadwalInsidental?: JadwalInsidentalItem[];
   apiUrl: string; // Configured Google Apps Script API URL
   apiConnected: boolean; // Is it currently fetching from the custom API
 }
@@ -193,6 +211,26 @@ export function isClassMatch(classField: string | null | undefined, targetClass:
   if (fLower === tLower) return true;
 
   return false;
+}
+
+export function checkIsNative(teacher: Teacher | undefined): boolean {
+  if (!teacher) return false;
+  const name = (teacher.nama || "").toLowerCase();
+  const tugas = (teacher.tugas_tambahan || "").toLowerCase();
+  const ket = (teacher.keterangan || "").toLowerCase();
+  const mapel = (teacher.mapel_utama || "").toLowerCase();
+  const rumpun = (teacher.rumpun || "").toLowerCase();
+
+  return (
+    name.includes("syaikh") ||
+    name.includes("syekh") ||
+    name.includes("native") ||
+    tugas.includes("native") ||
+    tugas.includes("syaikh") ||
+    ket.includes("native") ||
+    mapel.includes("native") ||
+    rumpun.includes("native")
+  );
 }
 
 

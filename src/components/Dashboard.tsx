@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Teacher, ScheduleItem, LogIzinItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch } from "../types";
+import { 
+  Teacher, ScheduleItem, LogIzinItem, ActivePage, JadwalInsidentalItem,
+  isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch, checkIsNative 
+} from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
   History, BarChart2, Shield, User, ChevronRight, X, Table, ChevronDown, Bell, Eye, EyeOff, AlertTriangle 
@@ -25,6 +28,7 @@ interface DashboardProps {
   teachers: Teacher[];
   schedules: ScheduleItem[];
   logs: LogIzinItem[];
+  jadwalInsidental?: JadwalInsidentalItem[];
   selectedTeacher: string;
   setSelectedTeacher: (name: string) => void;
   isAdmin: boolean;
@@ -35,6 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   teachers,
   schedules,
   logs = [],
+  jadwalInsidental = [],
   selectedTeacher,
   setSelectedTeacher,
   isAdmin,
@@ -209,18 +214,87 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Find current teacher details
   const currentTeacherObj = teachers.find(t => t.nama === selectedTeacher);
+  const isNativeTeacher = useMemo(() => checkIsNative(currentTeacherObj), [currentTeacherObj]);
 
-  // Filter schedules for the selected teacher and selected day
-  const todaysSchedules = schedules
-    .filter(s => isSameDay(s.hari, selectedDay) && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
-      g => g && g.trim().toLowerCase() === selectedTeacher.trim().toLowerCase()
-    ))
-    .sort((a, b) => a.jam_ke - b.jam_ke);
+  // 1. Get incidentals for selected date
+  const todaysIncidentals = useMemo(() => {
+    if (!jadwalInsidental) return [];
+    return jadwalInsidental.filter(inc => inc.tanggal === selectedDate);
+  }, [jadwalInsidental, selectedDate]);
 
-  // Group schedule items by jam_ke to merge two/three classes taught by the same teacher in 1 waktu
+  // 2. Process master schedules for selected day with Jadwal_Insidental override
+  const processedMasterSchedulesForDay = useMemo(() => {
+    const daySchedules = schedules.filter(s => isSameDay(s.hari, selectedDay));
+
+    return daySchedules.map(s => {
+      // Find matching incidental item by kelas and jam_ke for selectedDate
+      const incMatch = todaysIncidentals.find(inc => 
+        inc.kelas && inc.kelas.trim().toLowerCase() === s.kelas.trim().toLowerCase() &&
+        Number(inc.jam_ke) === Number(s.jam_ke)
+      );
+
+      if (incMatch) {
+        // OVERRIDE: Timpa mapel dan guru1 s/d guru6
+        return {
+          ...s,
+          mapel: incMatch.mapel || s.mapel,
+          guru1: incMatch.guru1 !== undefined && incMatch.guru1 !== "" ? incMatch.guru1 : s.guru1,
+          guru2: incMatch.guru2 !== undefined ? incMatch.guru2 : s.guru2,
+          guru3: incMatch.guru3 !== undefined ? incMatch.guru3 : s.guru3,
+          guru4: incMatch.guru4 !== undefined ? incMatch.guru4 : s.guru4,
+          guru5: incMatch.guru5 !== undefined ? incMatch.guru5 : s.guru5,
+          guru6: incMatch.guru6 !== undefined ? incMatch.guru6 : s.guru6,
+          keterangan_khusus: incMatch.keterangan_khusus || s.keterangan_khusus,
+          isOverridden: true,
+          keterangan_insidental: incMatch.keterangan_khusus || "",
+          alasan_insidental: incMatch.alasan || "",
+          tipe_insidental: incMatch.tipe_insidental || ""
+        };
+      }
+
+      return {
+        ...s,
+        isOverridden: false,
+        keterangan_insidental: "",
+        alasan_insidental: "",
+        tipe_insidental: ""
+      };
+    });
+  }, [schedules, selectedDay, todaysIncidentals]);
+
+  // 3. Filter regular schedules for selected teacher
+  const teacherRegularSchedules = useMemo(() => {
+    if (!selectedTeacher) return [];
+
+    const sTeacherLower = selectedTeacher.trim().toLowerCase();
+
+    let filtered = processedMasterSchedulesForDay.filter(s => {
+      const gurus = [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6];
+      return gurus.some(g => g && g.trim().toLowerCase() === sTeacherLower);
+    });
+
+    // Native Teacher Filtering (Syaikh/Syekh):
+    // Only show if isOverridden == true (Aktivasi Native)
+    if (isNativeTeacher) {
+      filtered = filtered.filter(s => {
+        if (!s.isOverridden) return false;
+        const tipe = (s.tipe_insidental || "").toLowerCase();
+        return (
+          tipe.includes("native") || 
+          tipe.includes("aktivasi") || 
+          tipe.includes("insidental") || 
+          s.isOverridden === true
+        );
+      });
+    }
+
+    return filtered.sort((a, b) => Number(a.jam_ke) - Number(b.jam_ke));
+  }, [processedMasterSchedulesForDay, selectedTeacher, isNativeTeacher]);
+
+  // Group regular schedule items by jam_ke
   const groupedSchedules = useMemo(() => {
-    const groups: Record<number, ScheduleItem[]> = {};
-    todaysSchedules.forEach(item => {
+    const groups: Record<number, typeof teacherRegularSchedules> = {};
+    teacherRegularSchedules.forEach(item => {
       if (!groups[item.jam_ke]) {
         groups[item.jam_ke] = [];
       }
@@ -234,13 +308,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const items = groups[jamKe];
         const first = items[0];
 
-        // Combine fields
         const mapel = [...new Set(items.map(i => i.mapel))].filter(Boolean).join(", ");
         const kelas = [...new Set(items.map(i => i.kelas))].filter(Boolean).join(", ");
         const ruangan = [...new Set(items.map(i => i.ruangan || "").filter(Boolean))].join(", ");
         const keterangan_khusus = [...new Set(items.map(i => i.keterangan_khusus || "").filter(Boolean))].join(", ");
+        const keterangan_insidental = [...new Set(items.map(i => i.keterangan_insidental || "").filter(Boolean))].join(", ");
+        const alasan_insidental = [...new Set(items.map(i => i.alasan_insidental || "").filter(Boolean))].join(", ");
+        const tipe_insidental = [...new Set(items.map(i => i.tipe_insidental || "").filter(Boolean))].join(", ");
+        const isOverridden = items.some(i => i.isOverridden);
 
-        // Determine if kelasgabung is "iya" / "ya" (case-insensitive)
         const isIya = items.some(i => {
           const kg = String(i.kelasgabung || "").trim().toLowerCase();
           return kg === "iya" || kg === "ya";
@@ -255,12 +331,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
           kelas,
           ruangan,
           keterangan_khusus,
+          keterangan_insidental,
+          alasan_insidental,
+          tipe_insidental,
+          isOverridden,
           kelasgabung: isIya ? "Iya" : "Tidak",
           isConflict: items.length > 1,
-          items // keep original list
+          isInval: false,
+          guru_izin: "",
+          alasan: "",
+          items
         };
       });
-  }, [todaysSchedules]);
+  }, [teacherRegularSchedules]);
 
   // Filter active logs (Tugas Inval) for the selected teacher on this date
   const activeInvalLogs = useMemo(() => {
@@ -273,21 +356,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const invalSchedules = useMemo(() => {
     return activeInvalLogs.map(log => {
-      // Find matching schedule in Jadwal array to extract details (mulai, selesai, keterangan_khusus)
-      const matchingSched = schedules.find(s => 
+      const matchingSched = processedMasterSchedulesForDay.find(s => 
         s.kelas && s.kelas.trim().toLowerCase() === log.kelas.trim().toLowerCase() && 
-        s.jam_ke === log.jam_ke
+        Number(s.jam_ke) === Number(log.jam_ke)
       );
 
       return {
         id: `inval-${log.id}`,
-        jam_ke: log.jam_ke,
+        jam_ke: Number(log.jam_ke),
         mulai: matchingSched?.mulai || JAM_TIME_MAP[log.jam_ke]?.split(" - ")[0] || "",
         selesai: matchingSched?.selesai || JAM_TIME_MAP[log.jam_ke]?.split(" - ")[1] || "",
         mapel: log.mapel || matchingSched?.mapel || "",
         kelas: log.kelas,
         ruangan: matchingSched?.ruangan || "",
         keterangan_khusus: matchingSched?.keterangan_khusus || "",
+        keterangan_insidental: matchingSched?.keterangan_insidental || "",
+        alasan_insidental: matchingSched?.alasan_insidental || "",
+        tipe_insidental: matchingSched?.tipe_insidental || "",
+        isOverridden: false,
         kelasgabung: matchingSched?.kelasgabung || "Tidak",
         isConflict: false,
         isInval: true,
@@ -296,18 +382,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
         items: matchingSched ? [matchingSched] : []
       };
     });
-  }, [activeInvalLogs, schedules]);
+  }, [activeInvalLogs, processedMasterSchedulesForDay]);
 
-  // Merge regular schedules and inval schedules
+  // Merge regular schedules and inval schedules with conflict handling (Inval vs Reguler)
   const mergedAllSchedules = useMemo(() => {
-    const regular = groupedSchedules.map(s => ({ 
-      ...s, 
-      isInval: false, 
-      guru_izin: "", 
-      alasan: "" 
+    const invalJamSet = new Set(invalSchedules.map(inv => inv.jam_ke));
+
+    const regularWithConflictFlags = groupedSchedules.map(reg => {
+      const hasInvalConflict = invalJamSet.has(reg.jam_ke);
+      return {
+        ...reg,
+        isCancelledForInval: hasInvalConflict
+      };
+    });
+
+    const invalWithFlags = invalSchedules.map(inv => ({
+      ...inv,
+      isCancelledForInval: false
     }));
-    const combined = [...regular, ...invalSchedules];
-    return combined.sort((a, b) => a.jam_ke - b.jam_ke);
+
+    const combined = [...regularWithConflictFlags, ...invalWithFlags];
+
+    return combined.sort((a, b) => {
+      if (a.jam_ke !== b.jam_ke) {
+        return a.jam_ke - b.jam_ke;
+      }
+      // If same jam_ke, show regular schedule (dibatalkan) first, then inval schedule
+      if (a.isInval !== b.isInval) {
+        return a.isInval ? 1 : -1;
+      }
+      return 0;
+    });
   }, [groupedSchedules, invalSchedules]);
 
   // Extract Wali kelas class name
@@ -652,12 +757,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     let labelText = "Kelas Tunggal";
                     let tagClass = "bg-blue-200/70 text-blue-900 border border-blue-300";
 
-                    if (item.isInval) {
-                      cardBgClass = "bg-yellow-100 hover:bg-yellow-200/60 border-yellow-300 border-l-4 border-l-yellow-500 text-yellow-950";
-                      badgeClass = "bg-yellow-200 text-yellow-900 border border-yellow-300";
+                    if (item.isCancelledForInval) {
+                      cardBgClass = "bg-slate-100 hover:bg-slate-200/60 border-slate-300 text-slate-600 opacity-75 font-medium";
+                      badgeClass = "bg-slate-200 text-slate-800 border border-slate-300 font-bold";
+                      dotClass = "bg-slate-400";
+                      labelText = "❌ Dibatalkan";
+                      tagClass = "bg-red-100 text-red-800 font-extrabold border border-red-300";
+                    } else if (item.isInval) {
+                      cardBgClass = "bg-yellow-50 hover:bg-yellow-100/70 border-yellow-300 border-l-4 border-l-yellow-500 text-yellow-950 shadow-xs";
+                      badgeClass = "bg-yellow-200 text-yellow-900 border border-yellow-300 font-bold";
                       dotClass = "bg-yellow-500";
                       labelText = "🚨 Tugas Inval";
-                      tagClass = "bg-yellow-300/75 text-yellow-900 border border-yellow-400";
+                      tagClass = "bg-yellow-300/75 text-yellow-950 font-extrabold border border-yellow-400";
+                    } else if (item.isOverridden) {
+                      cardBgClass = "bg-indigo-50/90 hover:bg-indigo-100/70 border-indigo-200 border-l-4 border-l-indigo-500 text-indigo-950 shadow-xs";
+                      badgeClass = "bg-indigo-200 text-indigo-900 border border-indigo-300 font-bold";
+                      dotClass = "bg-indigo-600";
+                      labelText = item.tipe_insidental ? `📍 ${item.tipe_insidental}` : "📍 Insidental";
+                      tagClass = "bg-indigo-200/80 text-indigo-950 font-extrabold border border-indigo-300";
                     } else if (isPendampingSlot) {
                       cardBgClass = "bg-purple-50 hover:bg-purple-100/60 border-purple-300 border-2 text-purple-950";
                       badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
@@ -706,13 +823,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 {labelText}
                               </span>
                             </div>
+
                             <h4 className="font-bold text-lg">{item.mapel}</h4>
 
-                            {item.isInval && (
-                              <p className="text-sm font-bold text-amber-700 flex items-center gap-1.5 bg-white/80 border border-amber-200/50 px-3 py-1.5 rounded-lg mt-1 w-fit shadow-2xs">
-                                <span>Menggantikan: {item.guru_izin}</span>
-                                {item.alasan && <span className="text-xs text-amber-600 font-medium">({item.alasan})</span>}
+                            {/* Cancelled Banner if conflict with Inval */}
+                            {item.isCancelledForInval && (
+                              <p className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg mt-1 w-fit shadow-2xs flex items-center gap-1.5">
+                                <span>❌ Dibatalkan. Utamakan tugas inval di jam ke-{item.jam_ke}.</span>
                               </p>
+                            )}
+
+                            {/* Inval Info Banner */}
+                            {item.isInval && (
+                              <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5 bg-white/90 border border-amber-200 px-3 py-1.5 rounded-lg mt-1 w-fit shadow-2xs">
+                                <span>Menggantikan: <strong>{item.guru_izin}</strong></span>
+                                {item.alasan && <span className="text-xs text-amber-700 font-medium">({item.alasan})</span>}
+                              </p>
+                            )}
+
+                            {/* Incidental Override Info */}
+                            {item.isOverridden && (
+                              <div className="mt-1.5 space-y-1">
+                                {item.keterangan_insidental && (
+                                  <p className="text-xs font-bold text-indigo-900 flex items-center gap-1.5 bg-indigo-100/80 border border-indigo-200 px-3 py-1 rounded-lg w-fit">
+                                    <span>📍 Ruang: {item.keterangan_insidental}</span>
+                                  </p>
+                                )}
+                                {item.alasan_insidental && (
+                                  <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 bg-white/90 border border-indigo-100 px-3 py-1 rounded-lg w-fit">
+                                    <span>💡 Info: {item.alasan_insidental}</span>
+                                  </p>
+                                )}
+                              </div>
                             )}
                             
                             {/* Other Teachers Badge List if other teachers are teaching */}

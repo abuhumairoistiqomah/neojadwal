@@ -89,7 +89,24 @@ function doGet(e) {
       "alasan": "alasan", "reason": "alasan", "keterangan": "alasan"
     });
 
-    // 4. Ambil data Akun dengan mapping alias robust
+    // 4. Ambil data Jadwal_Insidental dengan mapping alias robust
+    const jadwalInsidentalData = getSheetDataAsObjects(ss, "Jadwal_Insidental", {
+      "tanggal": "tanggal", "date": "tanggal",
+      "kelas": "kelas", "class": "kelas", "room": "kelas", "ruang": "kelas",
+      "jamke": "jam_ke", "jam ke": "jam_ke", "jam_ke": "jam_ke", "period": "jam_ke", "hour": "jam_ke",
+      "mata pelajaran": "mapel", "mapel": "mapel", "subject": "mapel", "mata_pelajaran": "mapel",
+      "guru1": "guru1", "guru 1": "guru1", "guru_1": "guru1", "teacher 1": "guru1",
+      "guru2": "guru2", "guru 2": "guru2", "guru_2": "guru2", "teacher 2": "guru2",
+      "guru3": "guru3", "guru 3": "guru3", "guru_3": "guru3", "teacher 3": "guru3",
+      "guru4": "guru4", "guru 4": "guru4", "guru_4": "guru4", "teacher 4": "guru4",
+      "guru5": "guru5", "guru 5": "guru5", "guru_5": "guru5", "teacher 5": "guru5",
+      "guru6": "guru6", "guru 6": "guru6", "guru_6": "guru6", "teacher 6": "guru6",
+      "keterangan khusus": "keterangan_khusus", "keterangan_khusus": "keterangan_khusus", "keterangan": "keterangan_khusus", "note": "keterangan_khusus",
+      "alasan": "alasan", "reason": "alasan",
+      "tipe_insidental": "tipe_insidental", "tipe insidental": "tipe_insidental", "tipe": "tipe_insidental", "type": "tipe_insidental"
+    });
+
+    // 5. Ambil data Akun dengan mapping alias robust
     const akunData = getSheetDataAsObjects(ss, "akun", {
       "id": "id", "username": "id", "userid": "id",
       "password": "password", "kata sandi": "password", "sandi": "password", "pass": "password",
@@ -101,6 +118,7 @@ function doGet(e) {
       status: "success",
       Master_Guru: masterGuruData,
       Jadwal: jadwalData,
+      Jadwal_Insidental: jadwalInsidentalData,
       Log_Izin: logIzinData,
       akun: akunData
     };
@@ -446,5 +464,13 @@ function initSheetsIfMissing(ss) {
     sheet = ss.insertSheet("akun");
     sheet.appendRow(["id", "password", "nama"]);
     sheet.appendRow(["admin", "admin", "Istiqomah As Sayfullooh"]);
+  }
+
+  // 5. Jadwal_Insidental
+  sheet = ss.getSheetByName("Jadwal_Insidental");
+  if (!sheet) {
+    sheet = ss.insertSheet("Jadwal_Insidental");
+    sheet.appendRow(["Tanggal", "kelas", "jamke", "mata pelajaran", "guru1", "guru2", "guru3", "guru4", "guru5", "guru6", "keterangan khusus", "Alasan", "Tipe_Insidental"]);
+    sheet.appendRow(["2026-07-21", "01 INTER 1", 3, "Science Lab", "ISTIQOMAH ASY SAYFULLOH, M.Pd", "", "", "", "", "", "Lab IPA Lt. 2", "Pindah Ruang Sementara", "Pindah Ruang"]);
   }
 }

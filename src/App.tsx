@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  Teacher, ScheduleItem, LogIzinItem, ActivePage 
+  Teacher, ScheduleItem, LogIzinItem, ActivePage, JadwalInsidentalItem 
 } from "./types";
 import { 
-  INITIAL_TEACHERS, INITIAL_SCHEDULES, INITIAL_LOGS, INITIAL_ACCOUNTS 
+  INITIAL_TEACHERS, INITIAL_SCHEDULES, INITIAL_LOGS, INITIAL_ACCOUNTS, INITIAL_INCIDENTALS 
 } from "./mockData";
 import { Dashboard } from "./components/Dashboard";
 import { JadwalLengkap } from "./components/JadwalLengkap";
@@ -47,6 +47,15 @@ export default function App() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [logs, setLogs] = useState<LogIzinItem[]>([]);
+  const [jadwalInsidental, setJadwalInsidental] = useState<JadwalInsidentalItem[]>(() => {
+    const stored = localStorage.getItem("db_jadwal_insidental");
+    return stored ? JSON.parse(stored) : INITIAL_INCIDENTALS;
+  });
+
+  const saveJadwalInsidental = (data: JadwalInsidentalItem[]) => {
+    setJadwalInsidental(data);
+    localStorage.setItem("db_jadwal_insidental", JSON.stringify(data));
+  };
   const [selectedTeacher, setSelectedTeacherState] = useState<string>("");
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     const storedAdmin = localStorage.getItem("db_is_admin");
@@ -383,6 +392,44 @@ export default function App() {
         });
 
         saveLogs(mappedLogIzin);
+
+        if (data.Jadwal_Insidental && Array.isArray(data.Jadwal_Insidental)) {
+          const mappedInsidental = data.Jadwal_Insidental.map((item: any, idx: number) => {
+            let tanggalStr = "";
+            if (item.tanggal) {
+              try {
+                const d = new Date(item.tanggal);
+                if (!isNaN(d.getTime())) {
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  tanggalStr = `${year}-${month}-${day}`;
+                } else {
+                  tanggalStr = String(item.tanggal).trim().split("T")[0];
+                }
+              } catch (e) {
+                tanggalStr = String(item.tanggal).trim().split("T")[0];
+              }
+            }
+            return {
+              id: item.id || `inc_${idx + 1}`,
+              tanggal: tanggalStr || item.tanggal || "",
+              kelas: String(item.kelas || "").trim(),
+              jam_ke: Number(item.jam_ke || 0),
+              mapel: String(item.mapel || "").trim(),
+              guru1: String(item.guru1 || "").trim(),
+              guru2: String(item.guru2 || "").trim(),
+              guru3: String(item.guru3 || "").trim(),
+              guru4: String(item.guru4 || "").trim(),
+              guru5: String(item.guru5 || "").trim(),
+              guru6: String(item.guru6 || "").trim(),
+              keterangan_khusus: String(item.keterangan_khusus || item.keterangan || "").trim(),
+              alasan: String(item.alasan || "").trim(),
+              tipe_insidental: String(item.tipe_insidental || item.tipe || "").trim()
+            };
+          });
+          saveJadwalInsidental(mappedInsidental);
+        }
 
         if (data.akun && Array.isArray(data.akun)) {
           setAccounts(data.akun);
@@ -910,6 +957,7 @@ export default function App() {
                 teachers={teachers}
                 schedules={schedules}
                 logs={logs}
+                jadwalInsidental={jadwalInsidental}
                 selectedTeacher={selectedTeacher}
                 setSelectedTeacher={setSelectedTeacher}
                 isAdmin={isAdmin}
