@@ -306,8 +306,8 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                 const formattedTime = (() => {
                                   const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(hari);
                                   const hasG12 = items.some(i => isGrade1Or2(i.kelas));
-                                  if (isMonToThu && hasG12 && jam === 6) {
-                                    return "14:00 - 14:20";
+                                  if (isMonToThu && jam === 6) {
+                                    return hasG12 ? "14:00 - 14:20" : "14:00 - 15:00";
                                   }
                                   return firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : "";
                                 })();
@@ -330,8 +330,8 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                 {(() => {
                                   const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(hari);
                                   const hasG12 = items.some(i => isGrade1Or2(i.kelas));
-                                  if (isMonToThu && hasG12 && jam === 6) {
-                                    return "14:00 - 14:20";
+                                  if (isMonToThu && jam === 6) {
+                                    return hasG12 ? "14:00 - 14:20" : "14:00 - 15:00";
                                   }
                                   return firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : "";
                                 })()}
@@ -482,8 +482,8 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                   const formattedTime = (() => {
                                     const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(hari);
                                     const hasG12 = items.some(i => isGrade1Or2(i.kelas));
-                                    if (isMonToThu && hasG12 && jam === 6) {
-                                      return "14:00 - 14:20";
+                                    if (isMonToThu && jam === 6) {
+                                      return hasG12 ? "14:00 - 14:20" : "14:00 - 15:00";
                                     }
                                     return firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : JAM_TIME_MAP[jam];
                                   })();
@@ -508,8 +508,8 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                                     {(() => {
                                       const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(hari);
                                       const hasG12 = items.some(i => isGrade1Or2(i.kelas));
-                                      if (isMonToThu && hasG12 && jam === 6) {
-                                        return "14:00 - 14:20";
+                                      if (isMonToThu && jam === 6) {
+                                        return hasG12 ? "14:00 - 14:20" : "14:00 - 15:00";
                                       }
                                       return firstItem.mulai && firstItem.selesai ? `${firstItem.mulai} - ${firstItem.selesai}` : JAM_TIME_MAP[jam];
                                     })()}

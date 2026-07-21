@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Teacher, ScheduleItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
-  History, BarChart2, Shield, User, ChevronRight, X, Table 
+  History, BarChart2, Shield, User, ChevronRight, X, Table, ChevronDown 
 } from "lucide-react";
 
 export const JAM_TIME_MAP: Record<number, string> = {
@@ -41,7 +41,91 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedDay, setSelectedDay] = useState<"Senin" | "Selasa" | "Rabu" | "Kamis" | "Jumat">("Senin");
+  const [dashboardType, setDashboardType] = useState<"guru" | "wali-kelas">("guru");
+  const [selectedClass, setSelectedClass] = useState<string>(() => {
+    return localStorage.getItem("dashboard_selected_class") || "";
+  });
   const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Compute all unique classes from schedules
+  const classesList = useMemo(() => {
+    const unique = new Set<string>();
+    schedules.forEach(s => {
+      if (s.kelas) {
+        unique.add(s.kelas.trim());
+      }
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [schedules]);
+
+  // Sync selectedClass with localStorage when it changes
+  useEffect(() => {
+    if (selectedClass) {
+      localStorage.setItem("dashboard_selected_class", selectedClass);
+    }
+  }, [selectedClass]);
+
+  // Set default class if not set or if current selected class is invalid
+  useEffect(() => {
+    if (classesList.length > 0) {
+      const saved = localStorage.getItem("dashboard_selected_class");
+      if (saved && classesList.includes(saved)) {
+        setSelectedClass(saved);
+      } else if (!selectedClass || !classesList.includes(selectedClass)) {
+        setSelectedClass(classesList[0]);
+      }
+    }
+  }, [classesList]);
+
+  // Compute daily schedule for the selected class
+  const classSchedulesToday = useMemo(() => {
+    if (!selectedClass) return [];
+    return schedules
+      .filter(s => isSameDay(s.hari, selectedDay) && s.kelas && s.kelas.trim().toLowerCase() === selectedClass.trim().toLowerCase())
+      .sort((a, b) => a.jam_ke - b.jam_ke);
+  }, [schedules, selectedDay, selectedClass]);
+
+  // Map daily class schedule to 1-6 periods
+  const classTimetable = useMemo(() => {
+    const periods = [1, 2, 3, 4, 5, 6];
+    return periods.map(jamKe => {
+      const items = classSchedulesToday.filter(s => s.jam_ke === jamKe);
+      if (items.length === 0) {
+        return {
+          jam_ke: jamKe,
+          isEmpty: true,
+          mapel: "Jam Kosong / Mandiri / Istirahat",
+          ruangan: "",
+          keterangan_khusus: "",
+          teachers: [] as string[],
+          items: [] as ScheduleItem[]
+        };
+      }
+      
+      const mapel = [...new Set(items.map(i => i.mapel))].filter(Boolean).join(", ");
+      const ruangan = [...new Set(items.map(i => i.ruangan || "").filter(Boolean))].join(", ");
+      const keterangan_khusus = [...new Set(items.map(i => i.keterangan_khusus || "").filter(Boolean))].join(", ");
+      
+      const allTeachers: string[] = [];
+      items.forEach(i => {
+        [i.guru1, i.guru2, i.guru3, i.guru4, i.guru5, i.guru6].forEach(g => {
+          if (g && g.trim() && !allTeachers.includes(g.trim())) {
+            allTeachers.push(g.trim());
+          }
+        });
+      });
+
+      return {
+        jam_ke: jamKe,
+        isEmpty: false,
+        mapel,
+        ruangan,
+        keterangan_khusus,
+        teachers: allTeachers,
+        items
+      };
+    });
+  }, [classSchedulesToday]);
 
   // Set today's day Indonesian name
   useEffect(() => {
@@ -149,288 +233,552 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Teacher Search Section */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-800 mb-3 flex items-center gap-2">
-          <Search className="w-5 h-5 text-blue-600" />
-          Pencarian Guru
-        </h2>
-        <p className="text-sm text-slate-500 mb-4">
-          Masukkan nama guru untuk menampilkan jadwal mengajar hari ini, jadwal lengkap mingguan, jam kosong, dan list mata pelajaran.
-        </p>
-        
-        <div className="relative" ref={suggestionsRef}>
-          <div className="relative">
-            <input
-              id="teacher-search-input"
-              type="text"
-              className="w-full pl-11 pr-10 py-3.5 bg-slate-50 hover:bg-slate-100/75 focus:bg-white text-slate-800 border border-slate-200 focus:border-blue-500 rounded-xl outline-none transition-all font-medium text-base shadow-sm"
-              placeholder="Cari Nama Guru atau Mata Pelajaran..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-            />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-              <Search className="w-5 h-5" />
+      {/* Dashboard Sub-Tabs */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-xs flex gap-2">
+        <button
+          id="tab-dashboard-guru"
+          onClick={() => setDashboardType("guru")}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            dashboardType === "guru"
+              ? "bg-blue-600 text-white shadow-sm font-extrabold"
+              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          }`}
+        >
+          <User className="w-5 h-5" />
+          <span>Dashboard Guru</span>
+        </button>
+        <button
+          id="tab-dashboard-wali-kelas"
+          onClick={() => setDashboardType("wali-kelas")}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            dashboardType === "wali-kelas"
+              ? "bg-blue-600 text-white shadow-sm font-extrabold"
+              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          }`}
+        >
+          <Users className="w-5 h-5" />
+          <span>Dashboard Wali Kelas</span>
+        </button>
+      </div>
+
+      {dashboardType === "guru" ? (
+        <>
+          {/* Teacher Search Section */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-slate-800 mb-3 flex items-center gap-2">
+              <Search className="w-5 h-5 text-blue-600" />
+              Pencarian Guru
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Masukkan nama guru untuk menampilkan jadwal mengajar hari ini, jadwal lengkap mingguan, jam kosong, dan list mata pelajaran.
+            </p>
+            
+            <div className="relative" ref={suggestionsRef}>
+              <div className="relative">
+                <input
+                  id="teacher-search-input"
+                  type="text"
+                  className="w-full pl-11 pr-10 py-3.5 bg-slate-50 hover:bg-slate-100/75 focus:bg-white text-slate-800 border border-slate-200 focus:border-blue-500 rounded-xl outline-none transition-all font-medium text-base shadow-sm"
+                  placeholder="Cari Nama Guru atau Mata Pelajaran..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search className="w-5 h-5" />
+                </div>
+                {selectedTeacher && (
+                  <button
+                    id="clear-search-btn"
+                    onClick={clearSelection}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition-colors"
+                    title="Hapus pilihan"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Autocomplete Suggestions */}
+              {showSuggestions && filteredTeachers.length > 0 && (
+                <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto divide-y divide-slate-100">
+                  {filteredTeachers.map((teacher) => (
+                    <button
+                      key={teacher.nama}
+                      id={`suggest-${teacher.nama.replace(/\s+/g, '-').toLowerCase()}`}
+                      onClick={() => handleSelectTeacher(teacher.nama)}
+                      className="w-full text-left px-5 py-3 hover:bg-blue-50/50 flex flex-col transition-colors group"
+                    >
+                      <span className="font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">
+                        {teacher.nama}
+                      </span>
+                      <span className="text-xs text-slate-400 mt-0.5">
+                        Mapel Utama: {teacher.mapel_utama} | Rumpun: {teacher.rumpun} | {teacher.jenjang}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {showSuggestions && searchQuery.trim() !== "" && filteredTeachers.length === 0 && (
+                <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-5 text-center text-slate-500 text-sm">
+                  Tidak menemukan guru dengan kata kunci "{searchQuery}"
+                </div>
+              )}
             </div>
-            {selectedTeacher && (
-              <button
-                id="clear-search-btn"
-                onClick={clearSelection}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition-colors"
-                title="Hapus pilihan"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+            {/* Selected Teacher Status Card */}
+            {currentTeacherObj && (
+              <div className="mt-4 p-4 bg-blue-50/40 border border-blue-100/50 rounded-xl flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                    {currentTeacherObj.nama[0]}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-800">{currentTeacherObj.nama}</h3>
+                    <p className="text-xs text-slate-500">
+                      {currentTeacherObj.mapel_utama} • {currentTeacherObj.jenjang} 
+                      {currentTeacherObj.wali_kelas ? ` • Wali Kelas ${currentTeacherObj.wali_kelas}` : ""}
+                      {currentTeacherObj.pendamping_kelas ? ` • Pendamping Kelas ${currentTeacherObj.pendamping_kelas}` : ""}
+                      {currentTeacherObj.is_manajemen ? " • Tim Manajemen" : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full font-medium">
+                  Guru Terpilih
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Autocomplete Suggestions */}
-          {showSuggestions && filteredTeachers.length > 0 && (
-            <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto divide-y divide-slate-100">
-              {filteredTeachers.map((teacher) => (
-                <button
-                  key={teacher.nama}
-                  id={`suggest-${teacher.nama.replace(/\s+/g, '-').toLowerCase()}`}
-                  onClick={() => handleSelectTeacher(teacher.nama)}
-                  className="w-full text-left px-5 py-3 hover:bg-blue-50/50 flex flex-col transition-colors group"
-                >
-                  <span className="font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">
-                    {teacher.nama}
-                  </span>
-                  <span className="text-xs text-slate-400 mt-0.5">
-                    Mapel Utama: {teacher.mapel_utama} | Rumpun: {teacher.rumpun} | {teacher.jenjang}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Today's Schedule (Timetable vertikal) */}
+          {selectedTeacher ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    Jadwal Hari Ini
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Menampilkan jadwal mengajar hari <span className="font-semibold text-blue-600">{selectedDay}</span>
+                  </p>
+                </div>
 
-          {showSuggestions && searchQuery.trim() !== "" && filteredTeachers.length === 0 && (
-            <div className="absolute z-30 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-5 text-center text-slate-500 text-sm">
-              Tidak menemukan guru dengan kata kunci "{searchQuery}"
-            </div>
-          )}
-        </div>
-
-        {/* Selected Teacher Status Card */}
-        {currentTeacherObj && (
-          <div className="mt-4 p-4 bg-blue-50/40 border border-blue-100/50 rounded-xl flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
-                {currentTeacherObj.nama[0]}
+                {/* Day Switcher */}
+                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                  {(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const).map((day) => (
+                    <button
+                      key={day}
+                      id={`day-switch-${day}`}
+                      onClick={() => setSelectedDay(day)}
+                      className={`flex-1 sm:flex-initial text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
+                        selectedDay === day
+                          ? "bg-white text-slate-900 shadow-xs font-bold"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-slate-800">{currentTeacherObj.nama}</h3>
-                <p className="text-xs text-slate-500">
-                  {currentTeacherObj.mapel_utama} • {currentTeacherObj.jenjang} 
-                  {currentTeacherObj.wali_kelas ? ` • Wali Kelas ${currentTeacherObj.wali_kelas}` : ""}
-                  {currentTeacherObj.pendamping_kelas ? ` • Pendamping Kelas ${currentTeacherObj.pendamping_kelas}` : ""}
-                  {currentTeacherObj.is_manajemen ? " • Tim Manajemen" : ""}
-                </p>
-              </div>
-            </div>
-            <div className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full font-medium">
-              Guru Terpilih
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Today's Schedule (Timetable vertikal) */}
-      {selectedTeacher ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                Jadwal Hari Ini
-              </h2>
-              <p className="text-sm text-slate-500">
-                Menampilkan jadwal mengajar hari <span className="font-semibold text-blue-600">{selectedDay}</span>
-              </p>
-            </div>
-
-            {/* Day Switcher */}
-            <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
-              {(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const).map((day) => (
-                <button
-                  key={day}
-                  id={`day-switch-${day}`}
-                  onClick={() => setSelectedDay(day)}
-                  className={`flex-1 sm:flex-initial text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
-                    selectedDay === day
-                      ? "bg-white text-slate-900 shadow-xs font-bold"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Schedule List */}
-          {groupedSchedules.length > 0 ? (
-            <div className="relative border-l border-blue-100 pl-6 ml-3 space-y-6">
-              {groupedSchedules.map((item) => {
-                const isConflict = item.isConflict;
-                const isGabung = item.kelasgabung === "Iya";
-                
-                const isITBA = currentTeacherObj ? checkIsITBA(currentTeacherObj) : false;
-                const isPendampingSlot = item.items.some(scItem => {
-                  const isGuru1 = scItem.guru1 && scItem.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
-                  if (isITBA) {
-                    const sName = (scItem.mapel || "").trim().toLowerCase();
-                    const isArabic = 
-                      sName.includes("arabic") || 
-                      sName.includes("bahasa arab") || 
-                      sName.includes("arab") || 
-                      sName.includes("b. arab") || 
-                      sName.includes("b.arab");
-                    if (isArabic) {
-                      return !isGuru1;
-                    }
-                    return !isITBACoreSubject(scItem.mapel, selectedTeacher);
-                  } else {
-                    const isSupervisingCol = scItem.selainguru1_mengawas && (scItem.selainguru1_mengawas.trim().toLowerCase() === "yes" || scItem.selainguru1_mengawas.trim().toLowerCase() === "ya");
-                    return !isGuru1 && isSupervisingCol;
-                  }
-                });
-
-                let cardBgClass = "bg-blue-50 hover:bg-blue-100/60 border-blue-200 text-blue-950";
-                let badgeClass = "bg-blue-100 text-blue-900 border border-blue-200";
-                let dotClass = "bg-blue-500";
-                let labelText = "Kelas Tunggal";
-                let tagClass = "bg-blue-200/70 text-blue-900 border border-blue-300";
-
-                if (isPendampingSlot) {
-                  cardBgClass = "bg-purple-50 hover:bg-purple-100/60 border-purple-300 border-2 text-purple-950";
-                  badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
-                  dotClass = "bg-purple-500";
-                  labelText = "Pendamping";
-                  tagClass = "bg-purple-200/70 text-purple-900 border border-purple-300";
-                } else if (isConflict) {
-                  if (isGabung) {
-                    cardBgClass = "bg-emerald-50 hover:bg-emerald-100/60 border-emerald-200 text-emerald-950";
-                    badgeClass = "bg-emerald-100 text-emerald-900 border border-emerald-200";
-                    dotClass = "bg-emerald-500";
-                    labelText = "Kelas Gabung (Iya)";
-                    tagClass = "bg-emerald-200/70 text-emerald-900 border border-emerald-300";
-                  } else {
-                    cardBgClass = "bg-pink-50 hover:bg-pink-100/60 border-pink-200 text-pink-950";
-                    badgeClass = "bg-pink-100 text-pink-900 border border-pink-200";
-                    dotClass = "bg-pink-500";
-                    labelText = "Bentrok! (Tidak Gabung)";
-                    tagClass = "bg-pink-200/70 text-pink-900 border border-pink-300";
-                  }
-                }
-
-                return (
-                  <div key={item.id} className="relative group">
-                    {/* Indicator Dot */}
-                    <div className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 border-white shadow-xs transition-transform group-hover:scale-125 duration-200 ${dotClass}`}></div>
+              {/* Schedule List */}
+              {groupedSchedules.length > 0 ? (
+                <div className="relative border-l border-blue-100 pl-6 ml-3 space-y-6">
+                  {groupedSchedules.map((item) => {
+                    const isConflict = item.isConflict;
+                    const isGabung = item.kelasgabung === "Iya";
                     
-                    {/* Item Details */}
-                    <div className={`${cardBgClass} border p-4 rounded-xl transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs`}>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${badgeClass}`}>
-                            Jam Ke-{item.jam_ke}
-                          </span>
-                          <span className="text-sm font-medium opacity-85">
-                            {(() => {
-                              const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(selectedDay);
-                              const hasG12 = item.items.some(i => isGrade1Or2(i.kelas));
-                              if (isMonToThu && hasG12 && item.jam_ke === 6) {
-                                return "14:00 - 14:20";
-                              }
-                              return item.mulai && item.selesai ? `${item.mulai} - ${item.selesai}` : JAM_TIME_MAP[item.jam_ke];
-                            })()}
-                          </span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${tagClass}`}>
-                            {labelText}
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-lg">{item.mapel}</h4>
+                    const isITBA = currentTeacherObj ? checkIsITBA(currentTeacherObj) : false;
+                    const isPendampingSlot = item.items.some(scItem => {
+                      const isGuru1 = scItem.guru1 && scItem.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
+                      if (isITBA) {
+                        const sName = (scItem.mapel || "").trim().toLowerCase();
+                        const isArabic = 
+                          sName.includes("arabic") || 
+                          sName.includes("bahasa arab") || 
+                          sName.includes("arab") || 
+                          sName.includes("b. arab") || 
+                          sName.includes("b.arab");
+                        if (isArabic) {
+                          return !isGuru1;
+                        }
+                        return !isITBACoreSubject(scItem.mapel, selectedTeacher);
+                      } else {
+                        const isSupervisingCol = scItem.selainguru1_mengawas && (scItem.selainguru1_mengawas.trim().toLowerCase() === "yes" || scItem.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                        return !isGuru1 && isSupervisingCol;
+                      }
+                    });
+
+                    let cardBgClass = "bg-blue-50 hover:bg-blue-100/60 border-blue-200 text-blue-950";
+                    let badgeClass = "bg-blue-100 text-blue-900 border border-blue-200";
+                    let dotClass = "bg-blue-500";
+                    let labelText = "Kelas Tunggal";
+                    let tagClass = "bg-blue-200/70 text-blue-900 border border-blue-300";
+
+                    if (isPendampingSlot) {
+                      cardBgClass = "bg-purple-50 hover:bg-purple-100/60 border-purple-300 border-2 text-purple-950";
+                      badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
+                      dotClass = "bg-purple-500";
+                      labelText = "Pendamping";
+                      tagClass = "bg-purple-200/70 text-purple-900 border border-purple-300";
+                    } else if (isConflict) {
+                      if (isGabung) {
+                        cardBgClass = "bg-emerald-50 hover:bg-emerald-100/60 border-emerald-200 text-emerald-950";
+                        badgeClass = "bg-emerald-100 text-emerald-900 border border-emerald-200";
+                        dotClass = "bg-emerald-500";
+                        labelText = "Kelas Gabung (Iya)";
+                        tagClass = "bg-emerald-200/70 text-emerald-900 border border-emerald-300";
+                      } else {
+                        cardBgClass = "bg-pink-50 hover:bg-pink-100/60 border-pink-200 text-pink-950";
+                        badgeClass = "bg-pink-100 text-pink-900 border border-pink-200";
+                        dotClass = "bg-pink-500";
+                        labelText = "Bentrok! (Tidak Gabung)";
+                        tagClass = "bg-pink-200/70 text-pink-900 border border-pink-300";
+                      }
+                    }
+
+                    return (
+                      <div key={item.id} className="relative group">
+                        {/* Indicator Dot */}
+                        <div className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 border-white shadow-xs transition-transform group-hover:scale-125 duration-200 ${dotClass}`}></div>
                         
-                        {/* Other Teachers Badge List if other teachers are teaching */}
-                        {(() => {
-                          const otherTeachersList: string[] = [];
-                          item.items.forEach(scItem => {
-                            const scTeachers = [
-                              scItem.guru1,
-                              scItem.guru2,
-                              scItem.guru3,
-                              scItem.guru4,
-                              scItem.guru5,
-                              scItem.guru6
-                            ].map(g => g?.trim()).filter(Boolean);
+                        {/* Item Details */}
+                        <div className={`${cardBgClass} border p-4 rounded-xl transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs`}>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded-md ${badgeClass}`}>
+                                Jam Ke-{item.jam_ke}
+                              </span>
+                              <span className="text-sm font-medium opacity-85">
+                                {(() => {
+                                  const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(selectedDay);
+                                  const hasG12 = item.items.some(i => isGrade1Or2(i.kelas));
+                                  if (isMonToThu && item.jam_ke === 6) {
+                                    return hasG12 ? "14:00 - 14:20" : "14:00 - 15:00";
+                                  }
+                                  return item.mulai && item.selesai ? `${item.mulai} - ${item.selesai}` : JAM_TIME_MAP[item.jam_ke];
+                                })()}
+                              </span>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${tagClass}`}>
+                                {labelText}
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-lg">{item.mapel}</h4>
                             
-                            scTeachers.forEach(tName => {
-                              if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
-                                otherTeachersList.push(tName);
+                            {/* Other Teachers Badge List if other teachers are teaching */}
+                            {(() => {
+                              const otherTeachersList: string[] = [];
+                              item.items.forEach(scItem => {
+                                const scTeachers = [
+                                  scItem.guru1,
+                                  scItem.guru2,
+                                  scItem.guru3,
+                                  scItem.guru4,
+                                  scItem.guru5,
+                                  scItem.guru6
+                                ].map(g => g?.trim()).filter(Boolean);
+                                
+                                scTeachers.forEach(tName => {
+                                  if (tName.toLowerCase() !== selectedTeacher.toLowerCase() && !otherTeachersList.includes(tName)) {
+                                    otherTeachersList.push(tName);
+                                  }
+                                });
+                              });
+
+                              if (otherTeachersList.length > 0) {
+                                return (
+                                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 bg-white/60 border border-slate-200/50 px-3 py-1.5 rounded-lg text-xs">
+                                    <span className="font-bold text-slate-500 uppercase text-[9px] tracking-wider block mr-1">Team Teaching:</span>
+                                    {otherTeachersList.map((tName, idx) => (
+                                      <span key={idx} className="bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-semibold shadow-2xs">
+                                        {tName}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
                               }
-                            });
-                          });
-
-                          if (otherTeachersList.length > 0) {
-                            return (
-                              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 bg-white/60 border border-slate-200/50 px-3 py-1.5 rounded-lg text-xs">
-                                <span className="font-bold text-slate-500 uppercase text-[9px] tracking-wider block mr-1">Team Teaching:</span>
-                                {otherTeachersList.map((tName, idx) => (
-                                  <span key={idx} className="bg-white border border-slate-200 text-slate-700 px-2 py-0.5 rounded-md font-semibold shadow-2xs">
-                                    {tName}
-                                  </span>
-                                ))}
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-6 text-sm">
-                        <div>
-                          <span className="block text-[10px] uppercase font-bold opacity-60">Kelas</span>
-                          <span className="font-semibold">{item.kelas}</span>
-                          {item.keterangan_khusus && (
-                            <span className="block text-[11px] font-medium text-indigo-600 mt-0.5">
-                              Keterangan Khusus: {item.keterangan_khusus}
-                            </span>
-                          )}
-                        </div>
-                        {item.ruangan && (
-                          <div>
-                            <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
-                            <span className="font-semibold">{item.ruangan}</span>
+                              return null;
+                            })()}
                           </div>
-                        )}
+
+                          <div className="flex flex-wrap items-center gap-6 text-sm">
+                            <div>
+                              <span className="block text-[10px] uppercase font-bold opacity-60">Kelas</span>
+                              <span className="font-semibold">{item.kelas}</span>
+                              {item.keterangan_khusus && (
+                                <span className="block text-[11px] font-medium text-indigo-600 mt-0.5">
+                                  Keterangan Khusus: {item.keterangan_khusus}
+                                </span>
+                              )}
+                            </div>
+                            {item.ruangan && (
+                              <div>
+                                <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
+                                <span className="font-semibold">{item.ruangan}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-500 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                  <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="font-medium text-slate-600">Tidak ada jadwal mengajar pada hari {selectedDay}</p>
+                  <p className="text-xs text-slate-400 mt-1">Hari ini adalah Jam Kosong (Free Period) bagi guru yang bersangkutan.</p>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="py-8 text-center text-slate-500 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
-              <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="font-medium text-slate-600">Tidak ada jadwal mengajar pada hari {selectedDay}</p>
-              <p className="text-xs text-slate-400 mt-1">Hari ini adalah Jam Kosong (Free Period) bagi guru yang bersangkutan.</p>
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+              <User className="w-12 h-12 text-blue-300 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-slate-800 mb-1">Informasi Jadwal Guru</h3>
+              <p className="text-slate-500 text-sm max-w-md mx-auto">
+                Silakan cari dan pilih nama guru terlebih dahulu untuk memuat jadwal, list mata pelajaran, dan analisis jam kosong secara interaktif.
+              </p>
             </div>
           )}
-        </div>
+        </>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
-          <User className="w-12 h-12 text-blue-300 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-slate-800 mb-1">Informasi Jadwal Guru</h3>
-          <p className="text-slate-500 text-sm max-w-md mx-auto">
-            Silakan cari dan pilih nama guru terlebih dahulu untuk memuat jadwal, list mata pelajaran, dan analisis jam kosong secara interaktif.
-          </p>
-        </div>
+        <>
+          {/* Class Selection Section */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-slate-800 mb-3 flex items-center gap-2">
+              <Table className="w-5 h-5 text-blue-600" />
+              Pilih Kelas
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Pilih kelas untuk menampilkan jadwal harian lengkap, wali kelas, pendamping kelas, dan urutan mata pelajaran per jam.
+            </p>
+            
+            <div className="relative max-w-xs">
+              <select
+                id="class-select-dropdown"
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="w-full pl-4 pr-10 py-3 bg-slate-50 hover:bg-slate-100/75 focus:bg-white text-slate-800 border border-slate-200 focus:border-blue-500 rounded-xl outline-none transition-all font-bold text-base shadow-sm appearance-none cursor-pointer"
+              >
+                {classesList.map((cls) => (
+                  <option key={cls} value={cls}>
+                    Kelas {cls}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500">
+                <ChevronDown className="w-5 h-5" />
+              </div>
+            </div>
+
+            {/* Class Metadata: Wali Kelas & Pendamping Kelas */}
+            {selectedClass && (
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5 border-t border-slate-100">
+                <div className="p-4 rounded-xl bg-indigo-50/40 border border-indigo-100/50 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold">
+                    WK
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">Wali Kelas</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {teachers.find(t => t.wali_kelas?.trim().toLowerCase() === selectedClass.trim().toLowerCase())?.nama || "Belum Ditentukan"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-purple-50/40 border border-purple-100/50 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold">
+                    PK
+                  </div>
+                  <div>
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">Pendamping Kelas</span>
+                    <span className="font-bold text-slate-800 text-sm">
+                      {teachers.find(t => t.pendamping_kelas?.trim().toLowerCase() === selectedClass.trim().toLowerCase())?.nama || "Belum Ditentukan"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Today's Schedule for Class */}
+          {selectedClass ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    Jadwal Harian Kelas {selectedClass}
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Menampilkan jadwal belajar hari <span className="font-semibold text-blue-600">{selectedDay}</span>
+                  </p>
+                </div>
+
+                {/* Day Switcher */}
+                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                  {(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const).map((day) => (
+                    <button
+                      key={day}
+                      id={`class-day-switch-${day}`}
+                      onClick={() => setSelectedDay(day)}
+                      className={`flex-1 sm:flex-initial text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
+                        selectedDay === day
+                          ? "bg-white text-slate-900 shadow-xs font-bold"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Timetable List */}
+              <div className="relative border-l border-blue-100 pl-6 ml-3 space-y-6">
+                {classTimetable.map((period) => {
+                  const isMonToThu = ["Senin", "Selasa", "Rabu", "Kamis"].includes(selectedDay);
+                  const hasG12 = isGrade1Or2(selectedClass);
+
+                  // Find any schedule in the database for this day and jam_ke to get the correct hours, matching the class type (G12 vs non-G12)
+                  const matchingScheduleForTime = schedules.find(
+                    s => isSameDay(s.hari, selectedDay) && 
+                         s.jam_ke === period.jam_ke && 
+                         isGrade1Or2(s.kelas) === hasG12 &&
+                         s.mulai && s.selesai
+                  );
+                  const dbTime = matchingScheduleForTime ? `${matchingScheduleForTime.mulai} - ${matchingScheduleForTime.selesai}` : null;
+
+                  const timeLabel = (isMonToThu && period.jam_ke === 6)
+                    ? (hasG12 ? "14:00 - 14:20" : "14:00 - 15:00")
+                    : dbTime 
+                      ? dbTime
+                      : JAM_TIME_MAP[period.jam_ke];
+
+                  if (period.isEmpty) {
+                    return (
+                      <div key={period.jam_ke} className="relative group">
+                        <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 border-white bg-slate-300 shadow-xs"></div>
+                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-200 text-slate-600 border border-slate-300">
+                                Jam Ke-{period.jam_ke}
+                              </span>
+                              <span className="text-sm font-medium text-slate-500">
+                                {timeLabel}
+                              </span>
+                            </div>
+                            <h4 className="font-semibold text-slate-400 italic">Jam Kosong / Istirahat / Belum Ada Jadwal</h4>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // If there is a lesson
+                  return (
+                    <div key={period.jam_ke} className="relative group">
+                      <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-4 border-white bg-blue-500 shadow-xs transition-transform group-hover:scale-125 duration-200"></div>
+                      
+                      <div className="bg-blue-50/50 hover:bg-blue-100/40 border border-blue-100 p-4 rounded-xl transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-100 text-blue-900 border border-blue-200">
+                              Jam Ke-{period.jam_ke}
+                            </span>
+                            <span className="text-sm font-medium text-slate-700">
+                              {timeLabel}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-lg text-slate-900">{period.mapel}</h4>
+                          
+                          {/* Teachers Display */}
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 bg-white/70 border border-slate-200/40 px-3 py-1.5 rounded-lg text-xs max-w-max">
+                            <span className="font-bold text-slate-500 uppercase text-[9px] tracking-wider block mr-1">Guru:</span>
+                            {period.teachers.map((teacherName, idx) => {
+                              // Determine if pendamping
+                              const isTeacherITBA = checkIsITBA({ nama: teacherName } as any);
+                              const relevantItem = period.items.find(i => 
+                                [i.guru1, i.guru2, i.guru3, i.guru4, i.guru5, i.guru6].some(g => g && g.trim().toLowerCase() === teacherName.trim().toLowerCase())
+                              );
+                              const isGuru1 = relevantItem?.guru1?.trim().toLowerCase() === teacherName.trim().toLowerCase();
+                              
+                              let isPendampingRole = false;
+                              if (relevantItem) {
+                                if (isTeacherITBA) {
+                                  const sName = (relevantItem.mapel || "").trim().toLowerCase();
+                                  const isArabic = 
+                                    sName.includes("arabic") || 
+                                    sName.includes("bahasa arab") || 
+                                    sName.includes("arab") || 
+                                    sName.includes("b. arab") || 
+                                    sName.includes("b.arab");
+                                  if (isArabic) {
+                                    isPendampingRole = !isGuru1;
+                                  } else {
+                                    isPendampingRole = !isITBACoreSubject(relevantItem.mapel, teacherName);
+                                  }
+                                } else {
+                                  const isSupervisingCol = relevantItem.selainguru1_mengawas && (relevantItem.selainguru1_mengawas.trim().toLowerCase() === "yes" || relevantItem.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                                  isPendampingRole = !isGuru1 && isSupervisingCol;
+                                }
+                              }
+
+                              return (
+                                <span 
+                                  key={idx} 
+                                  className={`px-2 py-0.5 rounded-md font-semibold shadow-2xs border ${
+                                    isPendampingRole
+                                      ? "bg-purple-100 text-purple-900 border-purple-200"
+                                      : "bg-blue-100 text-blue-900 border-blue-200"
+                                  }`}
+                                >
+                                  {teacherName} {isPendampingRole ? "(Pendamping)" : ""}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-6 text-sm">
+                          {period.ruangan && (
+                            <div>
+                              <span className="block text-[10px] uppercase font-bold text-slate-400">Ruangan</span>
+                              <span className="font-semibold text-slate-700">{period.ruangan}</span>
+                            </div>
+                          )}
+                          {period.keterangan_khusus && (
+                            <div className="max-w-[200px]">
+                              <span className="block text-[10px] uppercase font-bold text-slate-400">Keterangan</span>
+                              <span className="text-xs font-semibold text-slate-600 block line-clamp-2" title={period.keterangan_khusus}>
+                                {period.keterangan_khusus}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm text-center">
+              <Users className="w-12 h-12 text-blue-300 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-slate-800 mb-1">Informasi Jadwal Kelas</h3>
+              <p className="text-slate-500 text-sm max-w-md mx-auto">
+                Silakan pilih kelas terlebih dahulu untuk memuat jadwal pelajaran harian lengkap.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Grid Menu Button */}
