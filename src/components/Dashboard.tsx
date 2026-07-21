@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Teacher, ScheduleItem, LogIzinItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
-  History, BarChart2, Shield, User, ChevronRight, X, Table, ChevronDown 
+  History, BarChart2, Shield, User, ChevronRight, X, Table, ChevronDown, Bell, Eye, EyeOff, AlertTriangle 
 } from "lucide-react";
 
 export const JAM_TIME_MAP: Record<number, string> = {
@@ -44,6 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedDay, setSelectedDay] = useState<"Senin" | "Selasa" | "Rabu" | "Kamis" | "Jumat">("Senin");
   const [dashboardType, setDashboardType] = useState<"guru" | "wali-kelas">("guru");
+  const [showNotifications, setShowNotifications] = useState<boolean>(true);
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     return localStorage.getItem("dashboard_selected_class") || "";
   });
@@ -313,38 +314,54 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const waliClass = useMemo(() => {
     if (!currentTeacherObj) return null;
     const tugas = (currentTeacherObj.tugas_tambahan || "").toLowerCase().trim();
-    if (tugas === "wali kelas") {
-      return (currentTeacherObj.keterangan || "").trim();
+    const ket = (currentTeacherObj.keterangan || "").trim();
+    const wk = (currentTeacherObj.wali_kelas || "").trim();
+
+    if (tugas.includes("wali") || wk) {
+      if (ket && ket !== "-" && wk && !ket.toLowerCase().includes(wk.toLowerCase())) {
+        return `${wk}, ${ket}`;
+      }
+      return wk || (ket !== "-" ? ket : null);
     }
-    return currentTeacherObj.wali_kelas || null;
+    return wk || null;
   }, [currentTeacherObj]);
 
   // Filter logs for Wali kelas notification
   const waliLogsToday = useMemo(() => {
     if (!waliClass || !logs) return [];
-    return logs.filter(log => 
-      log.tanggal === selectedDate && 
-      isClassMatch(log.kelas, waliClass)
-    );
+    return logs
+      .filter(log => 
+        log.tanggal === selectedDate && 
+        isClassMatch(log.kelas, waliClass)
+      )
+      .sort((a, b) => Number(a.jam_ke || 0) - Number(b.jam_ke || 0));
   }, [logs, selectedDate, waliClass]);
 
   // Extract Pendamping kelas class name
   const pendampingClass = useMemo(() => {
     if (!currentTeacherObj) return null;
     const tugas = (currentTeacherObj.tugas_tambahan || "").toLowerCase().trim();
-    if (tugas.includes("pendamping")) {
-      return (currentTeacherObj.keterangan || "").trim();
+    const ket = (currentTeacherObj.keterangan || "").trim();
+    const pk = (currentTeacherObj.pendamping_kelas || "").trim();
+
+    if (tugas.includes("pendamping") || pk) {
+      if (ket && ket !== "-" && pk && !ket.toLowerCase().includes(pk.toLowerCase())) {
+        return `${pk}, ${ket}`;
+      }
+      return pk || (ket !== "-" ? ket : null);
     }
-    return currentTeacherObj.pendamping_kelas || null;
+    return pk || null;
   }, [currentTeacherObj]);
 
   // Filter logs for Pendamping kelas notification
   const pendampingLogsToday = useMemo(() => {
     if (!pendampingClass || !logs) return [];
-    return logs.filter(log => 
-      log.tanggal === selectedDate && 
-      isClassMatch(log.kelas, pendampingClass)
-    );
+    return logs
+      .filter(log => 
+        log.tanggal === selectedDate && 
+        isClassMatch(log.kelas, pendampingClass)
+      )
+      .sort((a, b) => Number(a.jam_ke || 0) - Number(b.jam_ke || 0));
   }, [logs, selectedDate, pendampingClass]);
 
   return (
@@ -377,29 +394,87 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </button>
       </div>
 
-      {/* Alert Banner for Wali Kelas */}
-      {selectedTeacher && waliClass && waliLogsToday.length > 0 && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 rounded-xl p-4 shadow-sm">
-          <div className="text-amber-800 font-bold text-sm space-y-2">
-            {waliLogsToday.map((log) => (
-              <div key={log.id} className="flex items-start gap-2">
-                <span>🔔 Info Kelas Anda ({waliClass}) Hari Ini: Jam ke-{log.jam_ke} ({log.mapel}), {log.guru_izin} izin. Kelas digantikan oleh {log.guru_pengganti || "Belum Ditentukan"}.</span>
+      {/* Alert Banner Container for Wali Kelas & Pendamping Kelas with Hide/Show Toggle */}
+      {selectedTeacher && (waliLogsToday.length > 0 || pendampingLogsToday.length > 0) && (
+        <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                <Bell className="w-5 h-5" />
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <div>
+                <h3 className="font-extrabold text-amber-950 text-sm flex items-center gap-2 flex-wrap">
+                  <span>Warning Notifikasi Guru Ganti Hari Ini</span>
+                  <span className="bg-amber-200 text-amber-900 text-xs px-2 py-0.5 rounded-full font-black">
+                    {waliLogsToday.length + pendampingLogsToday.length} Informasi
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-800/90 font-medium">
+                  Pengingat guru pengganti di kelas wali / dampingan Anda ({waliClass || pendampingClass})
+                </p>
+              </div>
+            </div>
 
-      {/* Alert Banner for Pendamping Kelas */}
-      {selectedTeacher && pendampingClass && pendampingLogsToday.length > 0 && (
-        <div className="bg-indigo-50 border-l-4 border-indigo-500 rounded-xl p-4 shadow-sm">
-          <div className="text-indigo-900 font-bold text-sm space-y-2">
-            {pendampingLogsToday.map((log) => (
-              <div key={log.id} className="flex items-start gap-2">
-                <span>🔔 Info Kelas Dampingan Anda ({pendampingClass}) Hari Ini: Jam ke-{log.jam_ke} ({log.mapel}), {log.guru_izin} izin. Kelas digantikan oleh {log.guru_pengganti || "Belum Ditentukan"}.</span>
-              </div>
-            ))}
+            <button
+              id="btn-toggle-notifications"
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="text-xs font-extrabold text-amber-950 bg-white hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+            >
+              {showNotifications ? (
+                <>
+                  <EyeOff className="w-4 h-4 text-amber-700" />
+                  <span>Sembunyikan Warning</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4 text-amber-700" />
+                  <span>Tampilkan Warning ({waliLogsToday.length + pendampingLogsToday.length})</span>
+                </>
+              )}
+            </button>
           </div>
+
+          {showNotifications && (
+            <div className="space-y-3 pt-2 border-t border-amber-200/60">
+              {/* Alert for Wali Kelas */}
+              {waliClass && waliLogsToday.length > 0 && (
+                <div className="bg-white border-l-4 border-amber-500 rounded-xl p-3.5 shadow-2xs">
+                  <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs mb-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="uppercase tracking-wider">INFO KELAS WALI ({waliClass}):</span>
+                  </div>
+                  <div className="text-slate-800 text-xs space-y-2">
+                    {waliLogsToday.map((log) => (
+                      <div key={log.id} className="flex items-start gap-2 bg-amber-50/80 p-2.5 rounded-lg border border-amber-100">
+                        <span className="leading-relaxed">
+                          🔔 Kelas <strong>{log.kelas}</strong> (Jam ke-{log.jam_ke} - <em>{log.mapel}</em>): Guru utama <strong>{log.guru_izin}</strong> izin. Digantikan oleh <strong className="text-amber-950 underline decoration-amber-400 font-extrabold">{log.guru_pengganti || "Belum Ditentukan"}</strong>.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Alert for Pendamping Kelas */}
+              {pendampingClass && pendampingLogsToday.length > 0 && (
+                <div className="bg-white border-l-4 border-indigo-500 rounded-xl p-3.5 shadow-2xs">
+                  <div className="flex items-center gap-2 text-indigo-950 font-extrabold text-xs mb-2.5">
+                    <Bell className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span className="uppercase tracking-wider">INFO KELAS DAMPINGAN ({pendampingClass}):</span>
+                  </div>
+                  <div className="text-slate-800 text-xs space-y-2">
+                    {pendampingLogsToday.map((log) => (
+                      <div key={log.id} className="flex items-start gap-2 bg-indigo-50/80 p-2.5 rounded-lg border border-indigo-100">
+                        <span className="leading-relaxed">
+                          🔔 Kelas <strong>{log.kelas}</strong> (Jam ke-{log.jam_ke} - <em>{log.mapel}</em>): Guru utama <strong>{log.guru_izin}</strong> izin. Digantikan oleh <strong className="text-indigo-950 underline decoration-indigo-400 font-extrabold">{log.guru_pengganti || "Belum Ditentukan"}</strong>.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

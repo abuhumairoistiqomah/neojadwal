@@ -146,23 +146,53 @@ export function isITBACoreSubject(mapelName: string, teacherName?: string): bool
   return false;
 }
 
-export function isClassMatch(classField: string | null | undefined, targetClass: string): boolean {
-  if (!classField) return false;
-  const targetClean = targetClass.trim().toLowerCase();
-  if (!targetClean) return false;
+export function isClassMatch(classField: string | null | undefined, targetClass: string | null | undefined): boolean {
+  if (!classField || !targetClass) return false;
 
-  // Split by common delimiters: comma, semicolon, slash, vertical bar, or newline
-  const parts = classField.split(/[;,/|\n]+/).map(p => p.trim().toLowerCase());
-  
-  return parts.some(part => {
-    const pClean = part.trim();
-    if (pClean === targetClean) return true;
-    
-    // Normalize consecutive spaces to single spaces
-    const normalizedPart = pClean.replace(/\s+/g, ' ');
-    const normalizedTarget = targetClean.replace(/\s+/g, ' ');
-    return normalizedPart === normalizedTarget;
-  });
+  // Clean prefixes like "Wali Kelas", "Pendamping Kelas", "Wali", "Pendamping", "Kelas"
+  const cleanField = String(classField)
+    .replace(/\b(wali\s+kelas|pendamping\s+kelas|wali|pendamping|kelas)\b/gi, "")
+    .trim();
+  const cleanTarget = String(targetClass)
+    .replace(/\b(wali\s+kelas|pendamping\s+kelas|wali|pendamping|kelas)\b/gi, "")
+    .trim();
+
+  if (!cleanField || !cleanTarget) return false;
+
+  // Split by common delimiters: comma, semicolon, slash, pipe, ampersand, 'and', newline
+  const splitRegex = /[;,/|\n&]+|\band\b/i;
+
+  const fieldParts = cleanField.split(splitRegex).map(p => p.trim()).filter(Boolean);
+  const targetParts = cleanTarget.split(splitRegex).map(p => p.trim()).filter(Boolean);
+
+  const normalizeToken = (tok: string) => {
+    let t = tok.toLowerCase().trim();
+    // Normalize "01 MQ" -> "1 mq", "MQ 1" -> "1 mq", "01" -> "1"
+    t = t.replace(/\b0+(\d+)\b/g, "$1"); // remove leading zero
+    // If format is "mq 1" or "mq 01", convert to "1 mq"
+    t = t.replace(/^mq\s*(\d+)$/i, "$1 mq");
+    return t;
+  };
+
+  const normFieldParts = fieldParts.map(normalizeToken);
+  const normTargetParts = targetParts.map(normalizeToken);
+
+  // Check if any normalized token matches
+  for (const f of normFieldParts) {
+    for (const t of normTargetParts) {
+      if (f === t) return true;
+      // Handle generic "mq" (e.g. Wali Kelas MQ matching "1 mq", "2 mq", "mq 1", "3 mq", etc.)
+      if ((f === "mq" || f === "tahfidz mq") && (t.includes("mq") || t.endsWith("mq"))) return true;
+      if ((t === "mq" || t === "tahfidz mq") && (f.includes("mq") || f.endsWith("mq"))) return true;
+    }
+  }
+
+  // Fallback: exact or case-insensitive equality on normalized strings
+  const fLower = cleanField.toLowerCase().replace(/\s+/g, " ");
+  const tLower = cleanTarget.toLowerCase().replace(/\s+/g, " ");
+  if (fLower === tLower) return true;
+
+  return false;
 }
 
 
