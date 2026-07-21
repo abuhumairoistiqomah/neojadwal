@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Teacher, ScheduleItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch } from "../types";
+import { Teacher, ScheduleItem, LogIzinItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
   History, BarChart2, Shield, User, ChevronRight, X, Table, ChevronDown 
@@ -24,6 +24,7 @@ export const isGrade1Or2 = (className: string): boolean => {
 interface DashboardProps {
   teachers: Teacher[];
   schedules: ScheduleItem[];
+  logs: LogIzinItem[];
   selectedTeacher: string;
   setSelectedTeacher: (name: string) => void;
   isAdmin: boolean;
@@ -33,6 +34,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({
   teachers,
   schedules,
+  logs = [],
   selectedTeacher,
   setSelectedTeacher,
   isAdmin,
@@ -127,17 +129,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [classSchedulesToday]);
 
-  // Set today's day Indonesian name
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  });
+
+  // Automatically sync selectedDay when selectedDate changes
   useEffect(() => {
+    if (!selectedDate) return;
+    const d = new Date(selectedDate);
+    if (isNaN(d.getTime())) return;
     const daysIndo = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-    const todayIndex = new Date().getDay();
-    const todayName = daysIndo[todayIndex];
-    if (["Senin", "Selasa", "Rabu", "Kamis", "Jumat"].includes(todayName)) {
-      setSelectedDay(todayName as any);
+    const dayName = daysIndo[d.getDay()];
+    if (["Senin", "Selasa", "Rabu", "Kamis", "Jumat"].includes(dayName)) {
+      setSelectedDay(dayName as any);
     } else {
-      setSelectedDay("Senin"); // Default to Monday if weekend
+      setSelectedDay("Senin"); // Default if weekend
     }
-  }, []);
+  }, [selectedDate]);
+
+  // Helper to change both day and sync date to the current week's respective day
+  const handleDaySelect = (dayName: "Senin" | "Selasa" | "Rabu" | "Kamis" | "Jumat") => {
+    const daysIndo = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    const targetIdx = daysIndo.indexOf(dayName);
+    const today = new Date();
+    const currentIdx = today.getDay();
+    const diff = targetIdx - currentIdx;
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + diff);
+    
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const dVal = String(targetDate.getDate()).padStart(2, "0");
+    
+    setSelectedDate(`${year}-${month}-${dVal}`);
+    setSelectedDay(dayName);
+  };
 
   // Sync searchQuery with selectedTeacher on load
   useEffect(() => {
@@ -231,6 +261,73 @@ export const Dashboard: React.FC<DashboardProps> = ({
       });
   }, [todaysSchedules]);
 
+  // Filter active logs (Tugas Inval) for the selected teacher on this date
+  const activeInvalLogs = useMemo(() => {
+    if (!selectedTeacher || !logs) return [];
+    return logs.filter(log => 
+      log.tanggal === selectedDate && 
+      log.guru_pengganti && log.guru_pengganti.trim().toLowerCase() === selectedTeacher.trim().toLowerCase()
+    );
+  }, [logs, selectedDate, selectedTeacher]);
+
+  const invalSchedules = useMemo(() => {
+    return activeInvalLogs.map(log => {
+      // Find matching schedule in Jadwal array to extract details (mulai, selesai, keterangan_khusus)
+      const matchingSched = schedules.find(s => 
+        s.kelas && s.kelas.trim().toLowerCase() === log.kelas.trim().toLowerCase() && 
+        s.jam_ke === log.jam_ke
+      );
+
+      return {
+        id: `inval-${log.id}`,
+        jam_ke: log.jam_ke,
+        mulai: matchingSched?.mulai || JAM_TIME_MAP[log.jam_ke]?.split(" - ")[0] || "",
+        selesai: matchingSched?.selesai || JAM_TIME_MAP[log.jam_ke]?.split(" - ")[1] || "",
+        mapel: log.mapel || matchingSched?.mapel || "",
+        kelas: log.kelas,
+        ruangan: matchingSched?.ruangan || "",
+        keterangan_khusus: matchingSched?.keterangan_khusus || "",
+        kelasgabung: matchingSched?.kelasgabung || "Tidak",
+        isConflict: false,
+        isInval: true,
+        guru_izin: log.guru_izin,
+        alasan: log.alasan,
+        items: matchingSched ? [matchingSched] : []
+      };
+    });
+  }, [activeInvalLogs, schedules]);
+
+  // Merge regular schedules and inval schedules
+  const mergedAllSchedules = useMemo(() => {
+    const regular = groupedSchedules.map(s => ({ 
+      ...s, 
+      isInval: false, 
+      guru_izin: "", 
+      alasan: "" 
+    }));
+    const combined = [...regular, ...invalSchedules];
+    return combined.sort((a, b) => a.jam_ke - b.jam_ke);
+  }, [groupedSchedules, invalSchedules]);
+
+  // Extract Wali kelas class name
+  const waliClass = useMemo(() => {
+    if (!currentTeacherObj) return null;
+    const tugas = (currentTeacherObj.tugas_tambahan || "").toLowerCase().trim();
+    if (tugas === "wali kelas") {
+      return (currentTeacherObj.keterangan || "").trim();
+    }
+    return currentTeacherObj.wali_kelas || null;
+  }, [currentTeacherObj]);
+
+  // Filter logs for Wali kelas notification
+  const waliLogsToday = useMemo(() => {
+    if (!waliClass || !logs) return [];
+    return logs.filter(log => 
+      log.tanggal === selectedDate && 
+      isClassMatch(log.kelas, waliClass)
+    );
+  }, [logs, selectedDate, waliClass]);
+
   return (
     <div className="space-y-6">
       {/* Dashboard Sub-Tabs */}
@@ -260,6 +357,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <span>Dashboard Wali Kelas</span>
         </button>
       </div>
+
+      {/* Alert Banner for Wali Kelas */}
+      {selectedTeacher && waliClass && waliLogsToday.length > 0 && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 rounded-xl p-4 shadow-sm">
+          <div className="text-amber-800 font-bold text-sm space-y-2">
+            {waliLogsToday.map((log) => (
+              <div key={log.id} className="flex items-start gap-2">
+                <span>🔔 Info Kelas Anda ({waliClass}) Hari Ini: Jam ke-{log.jam_ke} ({log.mapel}), {log.guru_izin} izin. Kelas digantikan oleh {log.guru_pengganti || "Belum Ditentukan"}.</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {dashboardType === "guru" ? (
         <>
@@ -357,7 +467,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Today's Schedule (Timetable vertikal) */}
           {selectedTeacher ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-blue-600" />
@@ -368,34 +478,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </p>
                 </div>
 
-                {/* Day Switcher */}
-                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
-                  {(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const).map((day) => (
-                    <button
-                      key={day}
-                      id={`day-switch-${day}`}
-                      onClick={() => setSelectedDay(day)}
-                      className={`flex-1 sm:flex-initial text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
-                        selectedDay === day
-                          ? "bg-white text-slate-900 shadow-xs font-bold"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                  {/* Date Picker */}
+                  <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Tanggal:</span>
+                    <input
+                      id="dashboard-date-picker"
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Day Switcher */}
+                  <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl flex-1 sm:flex-initial">
+                    {(["Senin", "Selasa", "Rabu", "Kamis", "Jumat"] as const).map((day) => (
+                      <button
+                        key={day}
+                        id={`day-switch-${day}`}
+                        onClick={() => handleDaySelect(day)}
+                        className={`flex-1 sm:flex-initial text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
+                          selectedDay === day
+                            ? "bg-white text-slate-900 shadow-xs font-bold"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Schedule List */}
-              {groupedSchedules.length > 0 ? (
+              {mergedAllSchedules.length > 0 ? (
                 <div className="relative border-l border-blue-100 pl-6 ml-3 space-y-6">
-                  {groupedSchedules.map((item) => {
+                  {mergedAllSchedules.map((item) => {
                     const isConflict = item.isConflict;
                     const isGabung = item.kelasgabung === "Iya";
                     
                     const isITBA = currentTeacherObj ? checkIsITBA(currentTeacherObj) : false;
-                    const isPendampingSlot = item.items.some(scItem => {
+                    const isPendampingSlot = !item.isInval && item.items.some(scItem => {
                       const isGuru1 = scItem.guru1 && scItem.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
                       if (isITBA) {
                         const sName = (scItem.mapel || "").trim().toLowerCase();
@@ -421,7 +545,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     let labelText = "Kelas Tunggal";
                     let tagClass = "bg-blue-200/70 text-blue-900 border border-blue-300";
 
-                    if (isPendampingSlot) {
+                    if (item.isInval) {
+                      cardBgClass = "bg-yellow-100 hover:bg-yellow-200/60 border-yellow-300 border-l-4 border-l-yellow-500 text-yellow-950";
+                      badgeClass = "bg-yellow-200 text-yellow-900 border border-yellow-300";
+                      dotClass = "bg-yellow-500";
+                      labelText = "🚨 Tugas Inval";
+                      tagClass = "bg-yellow-300/75 text-yellow-900 border border-yellow-400";
+                    } else if (isPendampingSlot) {
                       cardBgClass = "bg-purple-50 hover:bg-purple-100/60 border-purple-300 border-2 text-purple-950";
                       badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
                       dotClass = "bg-purple-500";
@@ -470,9 +600,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               </span>
                             </div>
                             <h4 className="font-bold text-lg">{item.mapel}</h4>
+
+                            {item.isInval && (
+                              <p className="text-sm font-bold text-amber-700 flex items-center gap-1.5 bg-white/80 border border-amber-200/50 px-3 py-1.5 rounded-lg mt-1 w-fit shadow-2xs">
+                                <span>Menggantikan: {item.guru_izin}</span>
+                                {item.alasan && <span className="text-xs text-amber-600 font-medium">({item.alasan})</span>}
+                              </p>
+                            )}
                             
                             {/* Other Teachers Badge List if other teachers are teaching */}
-                            {(() => {
+                            {!item.isInval && (() => {
                               const otherTeachersList: string[] = [];
                               item.items.forEach(scItem => {
                                 const scTeachers = [
@@ -511,17 +648,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <div>
                               <span className="block text-[10px] uppercase font-bold opacity-60">Kelas</span>
                               <span className="font-semibold">{item.kelas}</span>
-                              {item.keterangan_khusus && (
+                              {!item.isInval && item.keterangan_khusus && (
                                 <span className="block text-[11px] font-medium text-indigo-600 mt-0.5">
                                   Keterangan Khusus: {item.keterangan_khusus}
                                 </span>
                               )}
                             </div>
-                            {item.ruangan && (
-                              <div>
-                                <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
-                                <span className="font-semibold">{item.ruangan}</span>
-                              </div>
+                            {item.isInval ? (
+                              item.keterangan_khusus && (
+                                <div>
+                                  <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
+                                  <span className="font-semibold text-yellow-800">📍 Ruang: {item.keterangan_khusus}</span>
+                                </div>
+                              )
+                            ) : (
+                              item.ruangan && (
+                                <div>
+                                  <span className="block text-[10px] uppercase font-bold opacity-60">Ruangan</span>
+                                  <span className="font-semibold">{item.ruangan}</span>
+                                </div>
+                              )
                             )}
                           </div>
                         </div>

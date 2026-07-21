@@ -218,13 +218,25 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         );
         if (!isGuru1 && !isAssisting) return false;
 
-        if (isITBA) {
-          return isITBACoreSubject(s.mapel, candidate.nama);
-        }
+        // Blocker bypass rule for selainguru1_mengawas
+        const isSupervisingCol = s.selainguru1_mengawas && (
+          s.selainguru1_mengawas.trim().toLowerCase() === "yes" || 
+          s.selainguru1_mengawas.trim().toLowerCase() === "ya"
+        );
 
         if (isAssisting) {
-          const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
-          if (isSupervisingCol) return false;
+          if (isSupervisingCol) {
+            // If selainguru1_mengawas == "Ya", then ONLY guru1 is busy. Assisting teachers (guru2-6) are available.
+            return false;
+          } else {
+            // If selainguru1_mengawas == "Tidak" or empty, assisting teachers (guru2-6) are considered busy.
+            return true;
+          }
+        }
+
+        // For guru1, they are busy (unless ITBA non-core subject overrides it)
+        if (isITBA) {
+          return isITBACoreSubject(s.mapel, candidate.nama);
         }
 
         return true;

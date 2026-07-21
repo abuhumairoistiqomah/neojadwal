@@ -909,6 +909,7 @@ export default function App() {
               <Dashboard 
                 teachers={teachers}
                 schedules={schedules}
+                logs={logs}
                 selectedTeacher={selectedTeacher}
                 setSelectedTeacher={setSelectedTeacher}
                 isAdmin={isAdmin}
