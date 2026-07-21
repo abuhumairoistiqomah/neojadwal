@@ -397,19 +397,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Alert Banner Container for Wali Kelas & Pendamping Kelas with Hide/Show Toggle */}
       {selectedTeacher && (waliLogsToday.length > 0 || pendampingLogsToday.length > 0) && (
         <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs shrink-0 mt-0.5 sm:mt-0">
                 <Bell className="w-5 h-5" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-extrabold text-amber-950 text-sm flex items-center gap-2 flex-wrap">
                   <span>Warning Notifikasi Guru Ganti Hari Ini</span>
                   <span className="bg-amber-200 text-amber-900 text-xs px-2 py-0.5 rounded-full font-black">
                     {waliLogsToday.length + pendampingLogsToday.length} Informasi
                   </span>
                 </h3>
-                <p className="text-xs text-amber-800/90 font-medium">
+                <p className="text-xs text-amber-800/90 font-medium mt-0.5">
                   Pengingat guru pengganti di kelas wali / dampingan Anda ({waliClass || pendampingClass})
                 </p>
               </div>
@@ -418,7 +418,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               id="btn-toggle-notifications"
               onClick={() => setShowNotifications(!showNotifications)}
-              className="text-xs font-extrabold text-amber-950 bg-white hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+              className="w-full sm:w-auto text-xs font-extrabold text-amber-950 bg-white hover:bg-amber-100 border border-amber-300 px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
             >
               {showNotifications ? (
                 <>
