@@ -89,10 +89,11 @@ export default function App() {
   const headerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   // Google Apps Script API configuration
-  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbyFzDIDUnJV5x3qCtOu5B7iW5ZsLTB7Dv4RWB-2mh3LqEhCN9ePlEG6TiVMUSck1blZag/exec";
+  const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbx-Gb7Nd2i0nprHxZ5I7D5qrmfVmnAikdhsFXhoAa-voWIsD2d7l-Cnn8iHjPCyeFi3oQ/exec";
   const [apiUrl, setApiUrl] = useState<string>(() => {
     const val = localStorage.getItem("db_api_url");
     const oldDefaults = [
+      "https://script.google.com/macros/s/AKfycbyFzDIDUnJV5x3qCtOu5B7iW5ZsLTB7Dv4RWB-2mh3LqEhCN9ePlEG6TiVMUSck1blZag/exec",
       "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
       "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
       "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",
@@ -109,6 +110,7 @@ export default function App() {
   const [apiConnected, setApiConnected] = useState<boolean>(() => {
     const val = localStorage.getItem("db_api_url");
     const oldDefaults = [
+      "https://script.google.com/macros/s/AKfycbyFzDIDUnJV5x3qCtOu5B7iW5ZsLTB7Dv4RWB-2mh3LqEhCN9ePlEG6TiVMUSck1blZag/exec",
       "https://script.google.com/macros/s/AKfycbykdgn4RIJ278Vi72882tBzscRStDgq3djQV1fMhuuoZlKyogbxjZaqwHY3sBW_bDaIgw/exec",
       "https://script.google.com/macros/s/AKfycbypksJLLcqS_unneCbLB06gcWYfW9QMrJHBnsn9LeE3KfyAzLsJ-k1sU3zTvUs1uMV2rQ/exec",
       "https://script.google.com/macros/s/AKfycbz7L-wryLIq0XAg9CPsFT3FvuRpegD8YjFut_Z6edLctqHfNP1xiRDM38P1PLSkecME/exec",

@@ -273,18 +273,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       return gurus.some(g => g && g.trim().toLowerCase() === sTeacherLower);
     });
 
-    // Native Teacher Filtering (Syaikh/Syekh):
-    // Only show if isOverridden == true (Aktivasi Native)
+    // Layer 2: Native Speaker / Syaikh Filtering
     if (isNativeTeacher) {
       filtered = filtered.filter(s => {
-        if (!s.isOverridden) return false;
-        const tipe = (s.tipe_insidental || "").toLowerCase();
-        return (
-          tipe.includes("native") || 
-          tipe.includes("aktivasi") || 
-          tipe.includes("insidental") || 
-          s.isOverridden === true
-        );
+        const ketKhusus = (s.keterangan_khusus || "").toLowerCase();
+        const isRoutineNative = ketKhusus.includes("native");
+        const isIncidentalNative = s.isOverridden === true; // guru1-6 is already checked in filtered
+        return isRoutineNative || isIncidentalNative;
       });
     }
 
