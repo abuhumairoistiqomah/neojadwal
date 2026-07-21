@@ -162,27 +162,86 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       // Khusus Kholid dan Hariyadiq juga sibuk jika mengajar PE. Di luar itu (misal mendampingi Bahasa Inggris), mereka dianggap kosong/bisa digantikan.
       const isITBA = checkIsITBA(candidate);
       
-      const regularJpCount = schedules.filter(s => {
+      const regularTeachingJamKe = schedules.filter(s => {
         if (!isSameDay(s.hari, selectedDayName)) return false;
         const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
         const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
           g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
         );
         return isGuru1 || isAssisting;
-      }).length;
+      }).map(s => s.jam_ke);
 
-      const savedSubstituteJpCount = logs.filter(log => 
+      const savedSubstituteJamKe = logs.filter(log => 
         log.tanggal === tanggal && 
         log.guru_pengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
-      ).length;
+      ).map(log => log.jam_ke);
 
-      const currentFormSubstituteJpCount = generatedRows.filter((r, rIdx) => 
+      const currentFormSubstituteJamKe = generatedRows.filter((r, rIdx) => 
         (currentRowIndex !== undefined ? rIdx !== currentRowIndex : r.jam_ke !== jam_ke) &&
         r.selectedPengganti && 
         r.selectedPengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
-      ).length;
+      ).map(r => r.jam_ke);
 
-      const totalJpCount = regularJpCount + savedSubstituteJpCount + currentFormSubstituteJpCount;
+      const allOccupiedJamKe = new Set([...regularTeachingJamKe, ...savedSubstituteJamKe, ...currentFormSubstituteJamKe]);
+      const totalJpCount = allOccupiedJamKe.size;
+
+      let mengajarJp = 0;
+      let pendampingJp = 0;
+
+      allOccupiedJamKe.forEach(jk => {
+        const inSavedLogs = logs.some(log => 
+          log.tanggal === tanggal && 
+          log.guru_pengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase() && 
+          log.jam_ke === jk
+        );
+        const inCurrentForm = generatedRows.some((r, rIdx) => 
+          (currentRowIndex !== undefined ? rIdx !== currentRowIndex : r.jam_ke !== jam_ke) &&
+          r.selectedPengganti && 
+          r.selectedPengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase() && 
+          r.jam_ke === jk
+        );
+
+        if (inSavedLogs || inCurrentForm) {
+          mengajarJp++;
+        } else {
+          // Regular schedules for this jk
+          const regularSchedulesForJk = schedules.filter(s => 
+            isSameDay(s.hari, selectedDayName) && 
+            s.jam_ke === jk && 
+            ([s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+              g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
+            ))
+          );
+
+          if (regularSchedulesForJk.length > 0) {
+            const allArePendamping = regularSchedulesForJk.every(s => {
+              const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
+              if (isITBA) {
+                const sName = (s.mapel || "").trim().toLowerCase();
+                const isArabic = 
+                  sName.includes("arabic") || 
+                  sName.includes("bahasa arab") || 
+                  sName.includes("arab") || 
+                  sName.includes("b. arab") || 
+                  sName.includes("b.arab");
+                if (isArabic) {
+                  return !isGuru1;
+                }
+                return !isITBACoreSubject(s.mapel, candidate.nama);
+              } else {
+                const isSupervisingCol = s.selainguru1_mengawas && (s.selainguru1_mengawas.trim().toLowerCase() === "yes" || s.selainguru1_mengawas.trim().toLowerCase() === "ya");
+                return !isGuru1 && isSupervisingCol;
+              }
+            });
+
+            if (allArePendamping) {
+              pendampingJp++;
+            } else {
+              mengajarJp++;
+            }
+          }
+        }
+      });
 
       const isPendampingOnDay = schedules.some(s => {
         if (!isSameDay(s.hari, selectedDayName)) return false;
@@ -249,6 +308,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
           isPendamping: false, 
           isPendampingOnDay,
           jpCount: totalJpCount,
+          mengajarJp,
+          pendampingJp,
           score: -999, 
           reasons: ["Sedang mengajar kelas reguler"] 
         };
@@ -265,6 +326,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
           isPendamping: false, 
           isPendampingOnDay,
           jpCount: totalJpCount,
+          mengajarJp,
+          pendampingJp,
           score: -999, 
           reasons: ["Sudah ditunjuk sebagai inval di kelas lain"] 
         };
@@ -361,6 +424,8 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         isPendamping,
         isPendampingOnDay,
         jpCount: totalJpCount,
+        mengajarJp,
+        pendampingJp,
         score,
         reasons
       };
@@ -815,7 +880,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                     key={candidate.teacher.nama} 
                                     value={candidate.teacher.nama}
                                   >
-                                    {candidate.teacher.nama}{labelPendamping} [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | {badge} | Beban: {candidate.jpCount} JP)
+                                    {candidate.teacher.nama}{labelPendamping} [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | {badge} | Beban: {candidate.mengajarJp} + {candidate.pendampingJp} JP)
                                   </option>
                                 );
                               })}
@@ -832,7 +897,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                     key={candidate.teacher.nama} 
                                     value={candidate.teacher.nama}
                                   >
-                                    {candidate.teacher.nama} (MAHASISWA ITBA - BUKAN PENDAMPING) [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | Beban: {candidate.jpCount} JP)
+                                    {candidate.teacher.nama} (MAHASISWA ITBA - BUKAN PENDAMPING) [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score} | Beban: {candidate.mengajarJp} + {candidate.pendampingJp} JP)
                                   </option>
                                 );
                               })}
@@ -849,7 +914,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                     key={candidate.teacher.nama} 
                                     value={candidate.teacher.nama}
                                   >
-                                    {candidate.teacher.nama} (BEBAN TINGGI - MENGAJAR {candidate.jpCount} JP) [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score})
+                                    {candidate.teacher.nama} (BEBAN TINGGI - MENGAJAR {candidate.mengajarJp} + {candidate.pendampingJp} JP) [Mapel: {candidate.teacher.mapel_utama}] (Skor: {score})
                                   </option>
                                 );
                               })}
@@ -864,7 +929,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                   key={candidate.teacher.nama} 
                                   value={candidate.teacher.nama}
                                 >
-                                  {candidate.teacher.nama} [{reasons}] [Mapel: {candidate.teacher.mapel_utama}] (Beban: {candidate.jpCount} JP)
+                                  {candidate.teacher.nama} [{reasons}] [Mapel: {candidate.teacher.mapel_utama}] (Beban: {candidate.mengajarJp} + {candidate.pendampingJp} JP)
                                 </option>
                               );
                             })}
