@@ -146,4 +146,24 @@ export function isITBACoreSubject(mapelName: string, teacherName?: string): bool
   return false;
 }
 
+export function isClassMatch(classField: string | null | undefined, targetClass: string): boolean {
+  if (!classField) return false;
+  const targetClean = targetClass.trim().toLowerCase();
+  if (!targetClean) return false;
+
+  // Split by common delimiters: comma, semicolon, slash, vertical bar, or newline
+  const parts = classField.split(/[;,/|\n]+/).map(p => p.trim().toLowerCase());
+  
+  return parts.some(part => {
+    const pClean = part.trim();
+    if (pClean === targetClean) return true;
+    
+    // Normalize consecutive spaces to single spaces
+    const normalizedPart = pClean.replace(/\s+/g, ' ');
+    const normalizedTarget = targetClean.replace(/\s+/g, ' ');
+    return normalizedPart === normalizedTarget;
+  });
+}
+
+
 

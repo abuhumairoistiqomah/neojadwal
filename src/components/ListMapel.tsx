@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isITBACoreSubject } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isITBACoreSubject, isClassMatch } from "../types";
 import { ArrowLeft, BookOpen, ChevronUp, ChevronDown, UserCheck, Search, HelpCircle } from "lucide-react";
 
 interface ListMapelProps {
@@ -157,14 +157,15 @@ export const ListMapel: React.FC<ListMapelProps> = ({
       let isWaliAtauPendamping = false;
       let roleType: "Wali Kelas" | "Pendamping" | "Pendamping Guru Mapel" | null = null;
 
-      const classesList = allUniqueKelas.map(k => k.trim().toLowerCase());
-      const waliKelasClean = currentTeacher.wali_kelas ? currentTeacher.wali_kelas.trim().toLowerCase() : "";
-      const pendampingKelasClean = currentTeacher.pendamping_kelas ? currentTeacher.pendamping_kelas.trim().toLowerCase() : "";
+      const classesList = allUniqueKelas.map(k => k.trim());
 
-      if (waliKelasClean && classesList.includes(waliKelasClean)) {
+      const isWali = classesList.some(k => isClassMatch(currentTeacher.wali_kelas, k));
+      const isPendamping = classesList.some(k => isClassMatch(currentTeacher.pendamping_kelas, k));
+
+      if (isWali) {
         isWaliAtauPendamping = true;
         roleType = "Wali Kelas";
-      } else if (pendampingKelasClean && classesList.includes(pendampingKelasClean)) {
+      } else if (isPendamping) {
         isWaliAtauPendamping = true;
         roleType = "Pendamping";
       } else {

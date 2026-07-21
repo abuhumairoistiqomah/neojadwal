@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Teacher, ScheduleItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject } from "../types";
+import { Teacher, ScheduleItem, ActivePage, isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
   History, BarChart2, Shield, User, ChevronRight, X, Table, ChevronDown 
@@ -587,7 +587,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div>
                     <span className="block text-[10px] uppercase font-bold text-slate-400">Wali Kelas</span>
                     <span className="font-bold text-slate-800 text-sm">
-                      {teachers.find(t => t.wali_kelas?.trim().toLowerCase() === selectedClass.trim().toLowerCase())?.nama || "Belum Ditentukan"}
+                      {teachers.find(t => isClassMatch(t.wali_kelas, selectedClass))?.nama || "Belum Ditentukan"}
                     </span>
                   </div>
                 </div>
@@ -599,7 +599,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div>
                     <span className="block text-[10px] uppercase font-bold text-slate-400">Pendamping Kelas</span>
                     <span className="font-bold text-slate-800 text-sm">
-                      {teachers.find(t => t.pendamping_kelas?.trim().toLowerCase() === selectedClass.trim().toLowerCase())?.nama || "Belum Ditentukan"}
+                      {teachers.find(t => isClassMatch(t.pendamping_kelas, selectedClass))?.nama || "Belum Ditentukan"}
                     </span>
                   </div>
                 </div>
