@@ -328,6 +328,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
     );
   }, [logs, selectedDate, waliClass]);
 
+  // Extract Pendamping kelas class name
+  const pendampingClass = useMemo(() => {
+    if (!currentTeacherObj) return null;
+    const tugas = (currentTeacherObj.tugas_tambahan || "").toLowerCase().trim();
+    if (tugas.includes("pendamping")) {
+      return (currentTeacherObj.keterangan || "").trim();
+    }
+    return currentTeacherObj.pendamping_kelas || null;
+  }, [currentTeacherObj]);
+
+  // Filter logs for Pendamping kelas notification
+  const pendampingLogsToday = useMemo(() => {
+    if (!pendampingClass || !logs) return [];
+    return logs.filter(log => 
+      log.tanggal === selectedDate && 
+      isClassMatch(log.kelas, pendampingClass)
+    );
+  }, [logs, selectedDate, pendampingClass]);
+
   return (
     <div className="space-y-6">
       {/* Dashboard Sub-Tabs */}
@@ -365,6 +384,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {waliLogsToday.map((log) => (
               <div key={log.id} className="flex items-start gap-2">
                 <span>🔔 Info Kelas Anda ({waliClass}) Hari Ini: Jam ke-{log.jam_ke} ({log.mapel}), {log.guru_izin} izin. Kelas digantikan oleh {log.guru_pengganti || "Belum Ditentukan"}.</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Alert Banner for Pendamping Kelas */}
+      {selectedTeacher && pendampingClass && pendampingLogsToday.length > 0 && (
+        <div className="bg-indigo-50 border-l-4 border-indigo-500 rounded-xl p-4 shadow-sm">
+          <div className="text-indigo-900 font-bold text-sm space-y-2">
+            {pendampingLogsToday.map((log) => (
+              <div key={log.id} className="flex items-start gap-2">
+                <span>🔔 Info Kelas Dampingan Anda ({pendampingClass}) Hari Ini: Jam ke-{log.jam_ke} ({log.mapel}), {log.guru_izin} izin. Kelas digantikan oleh {log.guru_pengganti || "Belum Ditentukan"}.</span>
               </div>
             ))}
           </div>
