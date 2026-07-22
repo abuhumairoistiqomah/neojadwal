@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { 
   Teacher, ScheduleItem, LogIzinItem, ActivePage, JadwalInsidentalItem,
-  isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch, checkIsNative 
+  isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch, checkIsNative, isAlQuranOrTahsin 
 } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
@@ -727,6 +727,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     
                     const isITBA = currentTeacherObj ? checkIsITBA(currentTeacherObj) : false;
                     const isPendampingSlot = !item.isInval && item.items.some(scItem => {
+                      if (isAlQuranOrTahsin(scItem.mapel)) {
+                        return false;
+                      }
                       const isGuru1 = scItem.guru1 && scItem.guru1.trim().toLowerCase() === selectedTeacher.trim().toLowerCase();
                       if (isITBA) {
                         const sName = (scItem.mapel || "").trim().toLowerCase();
@@ -1102,7 +1105,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               
                               let isPendampingRole = false;
                               if (relevantItem) {
-                                if (isTeacherITBA) {
+                                if (isAlQuranOrTahsin(relevantItem.mapel)) {
+                                  isPendampingRole = false;
+                                } else if (isTeacherITBA) {
                                   const sName = (relevantItem.mapel || "").trim().toLowerCase();
                                   const isArabic = 
                                     sName.includes("arabic") || 

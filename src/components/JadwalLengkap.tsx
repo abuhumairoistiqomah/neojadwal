@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isITBACoreSubject } from "../types";
+import { Teacher, ScheduleItem, normalizeDay, checkIsITBA, isITBACoreSubject, isAlQuranOrTahsin } from "../types";
 import { ArrowLeft, BookOpen, AlertCircle, HelpCircle, Search, X, Clock, User, Calendar, GraduationCap, Users } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -241,6 +241,9 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                           const isConflict = items.length >= 2 && !isSlotGabung;
 
                           const isPendampingSlot = items.some(item => {
+                            if (isAlQuranOrTahsin(item.mapel)) {
+                              return false;
+                            }
                             const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === currentTeacher?.nama.trim().toLowerCase();
                             if (isITBA) {
                               const sName = (item.mapel || "").trim().toLowerCase();
@@ -417,6 +420,9 @@ export const JadwalLengkap: React.FC<JadwalLengkapProps> = ({
                             const isConflict = items.length >= 2 && !isSlotGabung;
 
                             const isPendampingSlot = items.some(item => {
+                              if (isAlQuranOrTahsin(item.mapel)) {
+                                return false;
+                              }
                               const isGuru1 = item.guru1 && item.guru1.trim().toLowerCase() === currentTeacher?.nama.trim().toLowerCase();
                               if (isITBA) {
                                 const sName = (item.mapel || "").trim().toLowerCase();

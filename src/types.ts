@@ -119,6 +119,22 @@ export function checkIsITBA(teacher: Teacher | undefined): boolean {
   );
 }
 
+export function isAlQuranOrTahsin(mapelName: string): boolean {
+  if (!mapelName) return false;
+  const sName = mapelName.trim().toLowerCase();
+  return (
+    sName.includes("qur'an") || 
+    sName.includes("quran") || 
+    sName.includes("tahsin") || 
+    sName.includes("tajwid") ||
+    sName.includes("tahfidz") ||
+    sName.includes("tahfizh") ||
+    sName.includes("tahfid") ||
+    sName.includes("tilawah") ||
+    sName.includes("murottal")
+  );
+}
+
 export function isITBACoreSubject(mapelName: string, teacherName?: string): boolean {
   if (!mapelName) return false;
   const sName = mapelName.trim().toLowerCase();

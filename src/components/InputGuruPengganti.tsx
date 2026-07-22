@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, isSameDay, isITBACoreSubject } from "../types";
+import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, isSameDay, isITBACoreSubject, isAlQuranOrTahsin } from "../types";
 import { 
   ArrowLeft, Calendar, UserCheck, HelpCircle, Save, 
   Trash2, Plus, Sparkles, CheckSquare, AlertTriangle, AlertCircle 
@@ -215,6 +215,9 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
           if (regularSchedulesForJk.length > 0) {
             const allArePendamping = regularSchedulesForJk.every(s => {
+              if (isAlQuranOrTahsin(s.mapel)) {
+                return false;
+              }
               const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
               if (isITBA) {
                 const sName = (s.mapel || "").trim().toLowerCase();
@@ -250,6 +253,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
           g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
         );
         if (!isGuru1 && !isAssisting) return false;
+        if (isAlQuranOrTahsin(s.mapel)) return false;
         if (isITBA) {
           const sName = (s.mapel || "").trim().toLowerCase();
           const isArabic = 
@@ -276,6 +280,11 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
           g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
         );
         if (!isGuru1 && !isAssisting) return false;
+
+        // Everyone teaching Al-Qur'an / Tahsin is a primary teacher and is busy!
+        if (isAlQuranOrTahsin(s.mapel)) {
+          return true;
+        }
 
         // Blocker bypass rule for selainguru1_mengawas
         const isSupervisingCol = s.selainguru1_mengawas && (
@@ -409,6 +418,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         );
         
         if (!isGuru1 && !isAssisting) return false;
+        if (isAlQuranOrTahsin(s.mapel)) return false;
         
         if (isITBA) {
           return !isITBACoreSubject(s.mapel, candidate.nama);
@@ -727,6 +737,9 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                       // Check if there is any schedule in matchingScheds where they are primary teaching (not just accompanying)
                       const hasPrimaryTeaching = matchingScheds.some(s => {
                         const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === guruIzin.trim().toLowerCase();
+                        if (isAlQuranOrTahsin(s.mapel)) {
+                          return true;
+                        }
                         if (isITBA) {
                           return isITBACoreSubject(s.mapel, guruIzin);
                         }
