@@ -1,3 +1,5 @@
+import React from "react";
+
 export interface Teacher {
   nama: string;
   panggilan?: string | null;
@@ -36,10 +38,11 @@ export interface LogIzinItem {
   tanggal: string; // YYYY-MM-DD
   guru_izin: string;
   alasan: string;
-  jam_ke: number; // Single hour (1-6)
+  jam_ke: number; // Single hour (0-6)
   kelas: string;
   mapel: string;
   guru_pengganti: string; // Name of replacement
+  tugas?: string;
   created_at?: string;
 }
 
@@ -247,6 +250,31 @@ export function checkIsNative(teacher: Teacher | undefined): boolean {
     mapel.includes("native") ||
     rumpun.includes("native")
   );
+}
+
+export function renderTaskWithLinks(text: string | undefined): React.ReactNode {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(/^(https?:\/\/|www\.)/i)) {
+      const href = part.toLowerCase().startsWith("www.") ? `https://${part}` : part;
+      return React.createElement(
+        "a",
+        {
+          key: index,
+          href: href,
+          target: "_blank",
+          rel: "noopener noreferrer",
+          className: "text-blue-600 hover:text-blue-800 underline font-semibold break-words transition-colors",
+          onClick: (e: React.MouseEvent) => e.stopPropagation(),
+        },
+        part
+      );
+    }
+    return part;
+  });
 }
 
 

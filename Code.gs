@@ -86,7 +86,8 @@ function doGet(e) {
       "kelas": "kelas", "class": "kelas",
       "mapel": "mapel", "subject": "mapel", "mata pelajaran": "mapel",
       "guru_ganti": "guru_pengganti", "guru ganti": "guru_pengganti", "guru_pengganti": "guru_pengganti", "guru pengganti": "guru_pengganti", "substitute": "guru_pengganti", "substitute_teacher": "guru_pengganti",
-      "alasan": "alasan", "reason": "alasan", "keterangan": "alasan"
+      "alasan": "alasan", "reason": "alasan", "keterangan": "alasan",
+      "tugas": "tugas", "task": "tugas", "link": "tugas", "keterangan tugas": "tugas", "keterangan_tugas": "tugas"
     });
 
     // 4. Ambil data Jadwal_Insidental dengan mapping alias robust
@@ -326,7 +327,7 @@ function doPost(e) {
         if (key === "tanggal") {
           row[index] = logItem.tanggal || "";
         } else if (key === "jamke" || key === "jam_ke") {
-          row[index] = Number(logItem.jam_ke) || 1;
+          row[index] = (logItem.jam_ke !== undefined && logItem.jam_ke !== null && logItem.jam_ke !== "") ? Number(logItem.jam_ke) : 1;
         } else if (key === "guru_izin") {
           row[index] = logItem.guru_izin || "";
         } else if (key === "kelas") {
@@ -337,6 +338,8 @@ function doPost(e) {
           row[index] = logItem.guru_pengganti || logItem.guru_ganti || "";
         } else if (key === "alasan") {
           row[index] = logItem.alasan || "";
+        } else if (key === "tugas" || key === "task" || key === "keterangan tugas" || key === "keterangan_tugas") {
+          row[index] = logItem.tugas || "";
         }
       });
 
@@ -414,7 +417,8 @@ function getSheetDataAsObjects(ss, sheetName, keyMapping) {
         
         // Konversi jam_ke ke tipe angka
         if (mappedKey === "jam_ke") {
-          val = parseInt(val, 10) || val;
+          const pInt = parseInt(val, 10);
+          val = !isNaN(pInt) ? pInt : val;
         }
 
         // Jangan over-write jika nilai baru kosong tetapi nilai lama sudah terisi (berguna jika ada alias ganda)
@@ -454,8 +458,8 @@ function initSheetsIfMissing(ss) {
   sheet = ss.getSheetByName("Log_Izin");
   if (!sheet) {
     sheet = ss.insertSheet("Log_Izin");
-    sheet.appendRow(["tanggal", "jamke", "guru_izin", "kelas", "mapel", "guru_ganti", "alasan"]);
-    sheet.appendRow(["2026-07-06", 2, "MUHAMMAD RIJAL ABDURAHMAN, S.M.Gr.", "01 INTER 1", "Math", "ISTIQOMAH ASY SAYFULLOH, M.Pd", "Sakit (Flu berat)"]);
+    sheet.appendRow(["tanggal", "jamke", "guru_izin", "kelas", "mapel", "guru_ganti", "alasan", "tugas"]);
+    sheet.appendRow(["2026-07-06", 2, "MUHAMMAD RIJAL ABDURAHMAN, S.M.Gr.", "01 INTER 1", "Math", "ISTIQOMAH ASY SAYFULLOH, M.Pd", "Sakit (Flu berat)", "https://classroom.google.com/c/sample"]);
   }
 
   // 4. akun

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { 
   Teacher, ScheduleItem, LogIzinItem, ActivePage, JadwalInsidentalItem,
-  isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch, checkIsNative, isAlQuranOrTahsin 
+  isSameDay, checkIsITBA, isITBACoreSubject, isClassMatch, checkIsNative, isAlQuranOrTahsin,
+  renderTaskWithLinks
 } from "../types";
 import { 
   Search, Calendar, BookOpen, Clock, Users, UserPlus, 
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 
 export const JAM_TIME_MAP: Record<number, string> = {
+  0: "07:00 - 07:30",
   1: "07:30 - 08:15",
   2: "08:15 - 09:00",
   3: "09:00 - 09:45",
@@ -374,6 +376,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         isInval: true,
         guru_izin: log.guru_izin,
         alasan: log.alasan,
+        tugas: log.tugas,
         items: matchingSched ? [matchingSched] : []
       };
     });
@@ -833,10 +836,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                             {/* Inval Info Banner */}
                             {item.isInval && (
-                              <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5 bg-white/90 border border-amber-200 px-3 py-1.5 rounded-lg mt-1 w-fit shadow-2xs">
-                                <span>Menggantikan: <strong>{item.guru_izin}</strong></span>
-                                {item.alasan && <span className="text-xs text-amber-700 font-medium">({item.alasan})</span>}
-                              </p>
+                              <div className="mt-1 space-y-1">
+                                <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5 bg-white/90 border border-amber-200 px-3 py-1.5 rounded-lg w-fit shadow-2xs">
+                                  <span>Menggantikan: <strong>{item.guru_izin}</strong></span>
+                                  {item.alasan && <span className="text-xs text-amber-700 font-medium">({item.alasan})</span>}
+                                </p>
+                                {item.tugas && (
+                                  <div className="text-xs text-blue-900 bg-blue-50/90 border border-blue-200 px-3 py-1.5 rounded-lg w-fit shadow-2xs space-y-0.5">
+                                    <span className="font-bold text-blue-700 block text-[10px] uppercase tracking-wider">📌 Tugas / Link Materi:</span>
+                                    <div className="font-medium break-words">
+                                      {renderTaskWithLinks(item.tugas)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             )}
 
                             {/* Incidental Override Info */}

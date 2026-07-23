@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { LogIzinItem } from "../types";
+import { LogIzinItem, renderTaskWithLinks } from "../types";
 import { 
   ArrowLeft, ClipboardList, Copy, Check, Search, Calendar, 
-  Trash2, ShieldAlert, CheckCircle, HelpCircle 
+  Trash2, ShieldAlert, CheckCircle, HelpCircle, FileText 
 } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -81,7 +81,8 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       let section = `*${guruIzin}* - ${alasan}\n`;
       
       logsList.forEach((log, index) => {
-        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* - *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*\n`;
+        const tugasText = log.tugas ? ` _(Tugas: ${log.tugas})_` : "";
+        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* - *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*${tugasText}\n`;
       });
       
       teacherSections.push(section.trimEnd());
@@ -215,6 +216,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                         <th className="p-3">Alasan</th>
                         <th className="p-3">Mata Pelajaran</th>
                         <th className="p-3">Kelas</th>
+                        <th className="p-3">Tugas / Link</th>
                         <th className="p-3">Guru Pengganti (Inval)</th>
                         {onDeleteLog && <th className="p-3 w-16 text-center">Aksi</th>}
                       </tr>
@@ -231,6 +233,15 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                           <td className="p-3 text-gray-500 italic font-medium">{log.alasan}</td>
                           <td className="p-3 font-medium">{log.mapel}</td>
                           <td className="p-3 font-bold text-gray-800">{log.kelas}</td>
+                          <td className="p-3 text-xs max-w-xs">
+                            {log.tugas ? (
+                              <span className="text-blue-900 font-medium break-words">
+                                {renderTaskWithLinks(log.tugas)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 italic">-</span>
+                            )}
+                          </td>
                           <td className="p-3">
                             <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">
                               {log.guru_pengganti}
@@ -277,6 +288,15 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                           </button>
                         )}
                       </div>
+
+                      {log.tugas && (
+                        <div className="p-2 bg-blue-50/70 border border-blue-100 rounded-lg text-[11px] text-blue-950 font-medium">
+                          <strong className="text-blue-800 block text-[10px] mb-0.5">📌 Tugas / Link:</strong>
+                          <div className="break-words">
+                            {renderTaskWithLinks(log.tugas)}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50/50 text-[10px] text-gray-500">
                         <div>

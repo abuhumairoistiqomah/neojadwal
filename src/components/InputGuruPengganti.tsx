@@ -53,12 +53,14 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
   }, [teachers, searchTeacherQuery]);
 
   const [alasan, setAlasan] = useState<string>("");
+  const [tugasInput, setTugasInput] = useState<string>("");
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
   const [generatedRows, setGeneratedRows] = useState<Array<{
     jam_ke: number;
     kelas: string;
     mapel: string;
     selectedPengganti: string;
+    tugas?: string;
   }>>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -77,16 +79,16 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
   // Handle Hour checkbox change
   const handleHourToggle = (hour: number) => {
     setSelectedHours(prev => 
-      prev.includes(hour) ? prev.filter(h => h !== hour) : [...prev, hour].sort()
+      prev.includes(hour) ? prev.filter(h => h !== hour) : [...prev, hour].sort((a, b) => a - b)
     );
   };
 
   // Handle Select All Hours
   const handleSelectAllHours = () => {
-    if (selectedHours.length === 6) {
+    if (selectedHours.length === 7) {
       setSelectedHours([]);
     } else {
-      setSelectedHours([1, 2, 3, 4, 5, 6]);
+      setSelectedHours([0, 1, 2, 3, 4, 5, 6]);
     }
   };
 
@@ -112,19 +114,33 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
     const rows = selectedHours.map(hour => {
       // Find all matching schedules for this hour
-      const matchingScheds = teacherSchedules.filter(s => s.jam_ke === hour);
+      const matchingScheds = teacherSchedules.filter(s => Number(s.jam_ke) === Number(hour));
       
       const uniqueKelas = [...new Set(matchingScheds.map(s => s.kelas))].filter(Boolean);
       const uniqueMapel = [...new Set(matchingScheds.map(s => s.mapel))].filter(Boolean);
 
-      const displayKelas = uniqueKelas.length > 0 ? uniqueKelas.join(" & ") : "X-MIPA-1";
-      const displayMapel = uniqueMapel.length > 0 ? uniqueMapel.join(" & ") : "Mata Pelajaran";
+      let displayKelas = uniqueKelas.length > 0 ? uniqueKelas.join(" & ") : "";
+      let displayMapel = uniqueMapel.length > 0 ? uniqueMapel.join(" & ") : "";
+
+      if (hour === 0) {
+        if (!displayKelas) {
+          const targetTeacherObj = teachers.find(t => t.nama === guruIzin);
+          displayKelas = targetTeacherObj?.wali_kelas || targetTeacherObj?.pendamping_kelas || "Semua Kelas";
+        }
+        if (!displayMapel) {
+          displayMapel = "JP-0 (Homeroom)";
+        }
+      } else {
+        if (!displayKelas) displayKelas = "X-MIPA-1";
+        if (!displayMapel) displayMapel = "Mata Pelajaran";
+      }
 
       return {
         jam_ke: hour,
         kelas: displayKelas,
         mapel: displayMapel,
         selectedPengganti: "",
+        tugas: tugasInput || "",
       };
     });
 
@@ -137,6 +153,13 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
     const targetTeacher = teachers.find(t => t.nama === guruIzin);
     if (!targetTeacher) return [];
+
+    // Find teachers who are already on leave on the selected date
+    const absentTeacherNamesOnDate = new Set(
+      logs.filter(log => log.tanggal === tanggal).map(l => l.guru_izin.trim().toLowerCase())
+    );
+
+    const isJp0Slot = jam_ke === 0 || subjectLabel.toLowerCase().includes("jp-0") || subjectLabel.toLowerCase().includes("homeroom");
 
     // 1. Get all candidate teachers (except the absent one and native teachers)
     const nativeTeachersToExclude = [
@@ -157,9 +180,6 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       let score = 0;
       const reasons: string[] = [];
 
-      // a. SYARAT MUTLAK: Guru harus sedang JAM KOSONG pada hari dan jam tersebut.
-      // Catatan Khusus ITBA: Guru ITBA hanya sibuk jika mengajar tugas wajib mereka (Al-Qur'an, Tahsin, Tajwid).
-      // Khusus Kholid dan Hariyadiq juga sibuk jika mengajar PE. Di luar itu (misal mendampingi Bahasa Inggris), mereka dianggap kosong/bisa digantikan.
       const isITBA = checkIsITBA(candidate);
       
       const regularTeachingJamKe = schedules.filter(s => {
@@ -183,12 +203,14 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       ).map(r => r.jam_ke);
 
       const allOccupiedJamKe = new Set([...regularTeachingJamKe, ...savedSubstituteJamKe, ...currentFormSubstituteJamKe]);
-      const totalJpCount = allOccupiedJamKe.size;
+      // Exclude JP-0 (0) from total JP load accumulation
+      const totalJpCount = Array.from(allOccupiedJamKe).filter(jk => jk !== 0).length;
 
       let mengajarJp = 0;
       let pendampingJp = 0;
 
       allOccupiedJamKe.forEach(jk => {
+        if (jk === 0) return; // Skip JP-0 in JP count calculation
         const inSavedLogs = logs.some(log => 
           log.tanggal === tanggal && 
           log.guru_pengganti.trim().toLowerCase() === candidate.nama.trim().toLowerCase() && 
@@ -204,7 +226,6 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         if (inSavedLogs || inCurrentForm) {
           mengajarJp++;
         } else {
-          // Regular schedules for this jk
           const regularSchedulesForJk = schedules.filter(s => 
             isSameDay(s.hari, selectedDayName) && 
             s.jam_ke === jk && 
@@ -273,7 +294,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       });
       
       const isBusy = schedules.some(s => {
-        if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
+        if (!isSameDay(s.hari, selectedDayName) || Number(s.jam_ke) !== Number(jam_ke)) return false;
         
         const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
         const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
@@ -281,12 +302,10 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         );
         if (!isGuru1 && !isAssisting) return false;
 
-        // Everyone teaching Al-Qur'an / Tahsin is a primary teacher and is busy!
         if (isAlQuranOrTahsin(s.mapel)) {
           return true;
         }
 
-        // Blocker bypass rule for selainguru1_mengawas
         const isSupervisingCol = s.selainguru1_mengawas && (
           s.selainguru1_mengawas.trim().toLowerCase() === "yes" || 
           s.selainguru1_mengawas.trim().toLowerCase() === "ya"
@@ -294,15 +313,12 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
         if (isAssisting) {
           if (isSupervisingCol) {
-            // If selainguru1_mengawas == "Ya", then ONLY guru1 is busy. Assisting teachers (guru2-6) are available.
             return false;
           } else {
-            // If selainguru1_mengawas == "Tidak" or empty, assisting teachers (guru2-6) are considered busy.
             return true;
           }
         }
 
-        // For guru1, they are busy (unless ITBA non-core subject overrides it)
         if (isITBA) {
           return isITBACoreSubject(s.mapel, candidate.nama);
         }
@@ -310,10 +326,13 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         return true;
       });
 
+      const isAbsentToday = absentTeacherNamesOnDate.has(candidate.nama.trim().toLowerCase());
+
       if (isBusy) {
         return { 
           teacher: candidate, 
           eligible: false, 
+          isAbsentToday,
           isPendamping: false, 
           isPendampingOnDay,
           jpCount: totalJpCount,
@@ -324,14 +343,14 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         };
       }
 
-      // b. SYARAT MUTLAK 2: Guru tidak sedang menjadi pengganti di kelas lain (Cek data Log_Izin di hari/jam yang sama).
       const isAlreadySubbing = logs.some(
-        log => log.tanggal === tanggal && log.jam_ke === jam_ke && log.guru_pengganti === candidate.nama
+        log => log.tanggal === tanggal && Number(log.jam_ke) === Number(jam_ke) && log.guru_pengganti === candidate.nama
       );
       if (isAlreadySubbing) {
         return { 
           teacher: candidate, 
           eligible: false, 
+          isAbsentToday,
           isPendamping: false, 
           isPendampingOnDay,
           jpCount: totalJpCount,
@@ -342,8 +361,18 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         };
       }
 
-      // c. Prioritas 1: Semapel (Mapel sama).
-      // Candidate's main subject matches the subject being replaced
+      // Special Recommendation Logic for JP-0 (Homeroom Session)
+      if (isJp0Slot) {
+        if (!candidate.is_manajemen && !candidate.wali_kelas) {
+          score += 200;
+          reasons.push("Guru Non-Manajemen & Bukan Wali Kelas (Prioritas Utama JP-0) (+200)");
+        } else if (candidate.pendamping_kelas || isPendampingOnDay) {
+          score += 100;
+          reasons.push("Guru Pendamping Wali Kelas (Prioritas Kedua JP-0) (+100)");
+        }
+      }
+
+      // Prioritas 1: Semapel
       const isSameMapel = candidate.mapel_utama.toLowerCase() === subjectLabel.toLowerCase() || 
                           candidate.mapel_utama.toLowerCase().includes(subjectLabel.toLowerCase()) ||
                           subjectLabel.toLowerCase().includes(candidate.mapel_utama.toLowerCase());
@@ -352,7 +381,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         reasons.push("Mata Pelajaran Sama (+100)");
       }
 
-      // d. Prioritas 2: Serumpun (Rumpun sama, misal Math dengan Sains, dipisah dengan koma di DB).
+      // Prioritas 2: Serumpun
       const targetRumpunList = targetTeacher.rumpun.split(",").map(r => r.trim().toLowerCase());
       const candidateRumpunList = candidate.rumpun.split(",").map(r => r.trim().toLowerCase());
       const hasSharedRumpun = candidateRumpunList.some(r => targetRumpunList.includes(r));
@@ -361,29 +390,28 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         reasons.push("Rumpun Bidang Sama (+50)");
       }
 
-      // e. Prioritas 3: Sejenjang (Sama-sama SD/SMP/SMA).
+      // Prioritas 3: Sejenjang
       if (candidate.jenjang === targetTeacher.jenjang) {
         score += 20;
         reasons.push("Jenjang Sama (+20)");
       }
 
-      // f. Prioritas 4: Wali Kelas (Turunkan prioritasnya, taruh di bawah).
-      if (candidate.wali_kelas) {
+      // Prioritas 4: Wali Kelas (Turunkan prioritasnya jika bukan khusus JP-0)
+      if (candidate.wali_kelas && !isJp0Slot) {
         score -= 15;
         reasons.push("Wali Kelas (-15)");
       }
 
-      // g. Prioritas 5: Manajemen (Turunkan ke prioritas paling bawah).
+      // Prioritas 5: Manajemen (Turunkan ke prioritas paling bawah)
       if (candidate.is_manajemen) {
         score -= 100;
         reasons.push("Tim Manajemen (-100)");
       }
 
-      // h. Catatan Tambahan untuk ITBA
+      // Catatan Tambahan untuk ITBA
       if (isITBA) {
-        // Check if they are scheduled in this slot for a non-core subject
         const isAssistingNonCore = schedules.some(
-          s => isSameDay(s.hari, selectedDayName) && s.jam_ke === jam_ke && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+          s => isSameDay(s.hari, selectedDayName) && Number(s.jam_ke) === Number(jam_ke) && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
             g => g && g.trim().toLowerCase() === candidate.nama.trim().toLowerCase()
           )
         );
@@ -396,21 +424,26 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         }
       }
 
-      // Rule 1: Beban mengajar lebih dari 5 JP pada hari tersebut diletakkan di bawah (tidak direkomendasikan)
+      // Rule 1: Beban mengajar lebih dari 5 JP
       if (totalJpCount > 5) {
         score -= 150;
         reasons.push(`Beban mengajar tinggi: ${totalJpCount} JP hari ini (-150)`);
       }
 
-      // Rule 2: Guru ITBA selain yang statusnya pendamping pada hari tersebut diletakkan di tengah (tidak diprioritaskan)
+      // Rule 2: ITBA non-pendamping
       if (isITBA && !isPendampingOnDay) {
         score -= 50;
         reasons.push("Mahasiswa ITBA bukan pendamping hari ini (-50)");
       }
 
-      // Check if they are currently assigned as a companion in this slot
+      // Penalty for Teachers Currently On Leave (Filter Sedang Izin)
+      if (isAbsentToday) {
+        score -= 5000;
+        reasons.push("Sedang Izin Hari Ini (-5000)");
+      }
+
       const isPendamping = schedules.some(s => {
-        if (!isSameDay(s.hari, selectedDayName) || s.jam_ke !== jam_ke) return false;
+        if (!isSameDay(s.hari, selectedDayName) || Number(s.jam_ke) !== Number(jam_ke)) return false;
         
         const isGuru1 = s.guru1 && s.guru1.trim().toLowerCase() === candidate.nama.trim().toLowerCase();
         const isAssisting = [s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
@@ -431,6 +464,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       return {
         teacher: candidate,
         eligible: true,
+        isAbsentToday,
         isPendamping,
         isPendampingOnDay,
         jpCount: totalJpCount,
@@ -448,7 +482,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       
     const ineligibleList = scoredCandidates
       .filter(c => !c.eligible)
-      .sort((a, b) => a.teacher.nama.localeCompare(b.teacher.nama));
+      .sort((a, b) => b.score - a.score || a.teacher.nama.localeCompare(b.teacher.nama));
       
     return [...eligibleList, ...ineligibleList];
   };
@@ -457,6 +491,13 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
   const handlePenggantiChange = (index: number, teacherName: string) => {
     const updated = [...generatedRows];
     updated[index].selectedPengganti = teacherName;
+    setGeneratedRows(updated);
+  };
+
+  // Handle individual task/note per JP row
+  const handleTugasChange = (index: number, taskValue: string) => {
+    const updated = [...generatedRows];
+    updated[index].tugas = taskValue;
     setGeneratedRows(updated);
   };
 
@@ -490,6 +531,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       kelas: row.kelas,
       mapel: row.mapel,
       guru_pengganti: row.selectedPengganti,
+      tugas: row.tugas || tugasInput || "",
     }));
 
     onAddLogs(newLogs);
@@ -500,6 +542,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
     setSearchTeacherQuery("");
     setShowTeacherSuggestions(false);
     setAlasan("");
+    setTugasInput("");
     setSelectedHours([]);
     setGeneratedRows([]);
     
@@ -698,6 +741,22 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
               />
             </div>
 
+            {/* Field C2: Catatan Tugas / Link Materi */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="block text-sm font-bold text-gray-700 flex items-center justify-between">
+                <span>Catatan Tugas / Link Materi (Opsional)</span>
+                <span className="text-xs font-normal text-gray-400">Tersedia hyperlink otomatis (http://, https://, www.)</span>
+              </label>
+              <input
+                id="input-tugas-materi"
+                type="text"
+                placeholder="Contoh: Kerjakan LKS Hal 25 atau buka Google Classroom https://classroom.google.com/c/xxx"
+                value={tugasInput}
+                onChange={(e) => setTugasInput(e.target.value)}
+                className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white text-gray-800 border border-gray-200 focus:border-indigo-500 rounded-xl p-3 focus:outline-none transition-all text-sm font-medium"
+              />
+            </div>
+
             {/* Field D: Checkbox Jam Ke- */}
             <div className="space-y-2 md:col-span-2">
               <div className="flex justify-between items-center">
@@ -711,12 +770,12 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                   className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
-                  {selectedHours.length === 6 ? "Deselect All" : "Select All"}
+                  {selectedHours.length === 7 ? "Deselect All" : "Select All"}
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
-                {[1, 2, 3, 4, 5, 6].map((hour) => {
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 pt-1">
+                {[0, 1, 2, 3, 4, 5, 6].map((hour) => {
                   let status: "free" | "mengajar" | "mendamping" = "free";
                   let classText = "";
 
@@ -725,7 +784,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                     const isITBA = targetTeacherObj ? checkIsITBA(targetTeacherObj) : false;
 
                     const matchingScheds = schedules.filter(
-                      s => isSameDay(s.hari, selectedDayName) && s.jam_ke === hour && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
+                      s => isSameDay(s.hari, selectedDayName) && Number(s.jam_ke) === hour && [s.guru1, s.guru2, s.guru3, s.guru4, s.guru5, s.guru6].some(
                         g => g && g.trim().toLowerCase() === guruIzin.trim().toLowerCase()
                       )
                     );
@@ -751,6 +810,14 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                       } else {
                         status = "mendamping";
                       }
+                    } else if (hour === 0 && targetTeacherObj) {
+                      if (targetTeacherObj.wali_kelas) {
+                        status = "mengajar";
+                        classText = targetTeacherObj.wali_kelas;
+                      } else if (targetTeacherObj.pendamping_kelas) {
+                        status = "mendamping";
+                        classText = targetTeacherObj.pendamping_kelas;
+                      }
                     }
                   }
 
@@ -768,14 +835,16 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                   return (
                     <label 
                       key={hour}
-                      className={`p-3 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
+                      className={`p-2.5 border rounded-xl flex flex-col justify-between cursor-pointer transition-all ${
                         selectedHours.includes(hour)
                           ? "bg-indigo-50 border-indigo-300 text-indigo-900 shadow-sm"
                           : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-extrabold text-sm">Jam Ke-{hour}</span>
+                        <span className="font-extrabold text-xs">
+                          {hour === 0 ? "JP-0 (Homeroom)" : `Jam Ke-${hour}`}
+                        </span>
                         <input
                           id={`hour-check-${hour}`}
                           type="checkbox"
@@ -848,7 +917,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                       <div className="space-y-1 lg:max-w-xs">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-2.5 py-0.5 rounded">
-                            Jam Ke-{row.jam_ke}
+                            {row.jam_ke === 0 ? "JP-0 (Homeroom)" : `Jam Ke-${row.jam_ke}`}
                           </span>
                           <span className="text-xs font-medium text-gray-400">
                             {JAM_TIME_MAP[row.jam_ke]}
@@ -874,10 +943,10 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                         >
                           <option value="">-- Pilih Guru Pengganti --</option>
                           
-                           {/* 1. Best Recommendations */}
+                          {/* 1. Best Recommendations */}
                           <optgroup label="✨ REKOMENDASI TERBAIK (JAM KOSONG & PENDAMPING HARI INI) ✨">
                             {recommendations
-                              .filter(c => c.eligible && c.jpCount <= 5 && !(checkIsITBA(c.teacher) && !c.isPendampingOnDay))
+                              .filter(c => c.eligible && !c.isAbsentToday && c.jpCount <= 5 && !(checkIsITBA(c.teacher) && !c.isPendampingOnDay))
                               .map(candidate => {
                                 const score = candidate.score;
                                 const badge = score >= 100 
@@ -902,7 +971,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                           {/* 2. ITBA Non-companion Today */}
                           <optgroup label="⚠️ TIDAK DIPRIORITASKAN (MAHASISWA ITBA BUKAN PENDAMPING HARI INI) ⚠️">
                             {recommendations
-                              .filter(c => c.eligible && c.jpCount <= 5 && (checkIsITBA(c.teacher) && !c.isPendampingOnDay))
+                              .filter(c => c.eligible && !c.isAbsentToday && c.jpCount <= 5 && (checkIsITBA(c.teacher) && !c.isPendampingOnDay))
                               .map(candidate => {
                                 const score = candidate.score;
                                 return (
@@ -919,7 +988,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                           {/* 3. Teaching workload > 5 JP Today */}
                           <optgroup label="🚫 TIDAK DIREKOMENDASIKAN (BEBAN MENGAJAR > 5 JP HARI INI) 🚫">
                             {recommendations
-                              .filter(c => c.eligible && c.jpCount > 5)
+                              .filter(c => c.eligible && !c.isAbsentToday && c.jpCount > 5)
                               .map(candidate => {
                                 const score = candidate.score;
                                 return (
@@ -935,7 +1004,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
                           {/* 4. Ineligible / Busy Teachers (Override) */}
                           <optgroup label="🔒 GURU SEDANG MENGAJAR / BERTUGAS LAIN (OVERRIDE) 🔒">
-                            {recommendations.filter(c => !c.eligible).map(candidate => {
+                            {recommendations.filter(c => !c.eligible && !c.isAbsentToday).map(candidate => {
                               const reasons = candidate.reasons.join(", ");
                               return (
                                 <option 
@@ -946,6 +1015,18 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                                 </option>
                               );
                             })}
+                          </optgroup>
+
+                          {/* 5. Teachers Currently On Leave (Bottom Priority) */}
+                          <optgroup label="🛑 GURU SEDANG IZIN HARI INI (BOTTOM PRIORITY) 🛑">
+                            {recommendations.filter(c => c.isAbsentToday).map(candidate => (
+                              <option 
+                                key={candidate.teacher.nama} 
+                                value={candidate.teacher.nama}
+                              >
+                                {candidate.teacher.nama} (Sedang Izin) [Mapel: {candidate.teacher.mapel_utama}] (Beban: {candidate.mengajarJp} + {candidate.pendampingJp} JP)
+                              </option>
+                            ))}
                           </optgroup>
 
                           {recommendations.length === 0 && (
@@ -964,6 +1045,20 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                             ))}
                           </div>
                         )}
+
+                        {/* Per-JP Task / Material Link input field */}
+                        <div className="mt-2.5">
+                          <label className="block text-[11px] font-bold text-gray-500 mb-1">
+                            📌 Catatan Tugas / Link Materi ({row.jam_ke === 0 ? "JP-0" : `Jam Ke-${row.jam_ke}`}):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: Buka LKS Hal 15 atau link https://classroom.google.com/..."
+                            value={row.tugas || ""}
+                            onChange={(e) => handleTugasChange(index, e.target.value)}
+                            className="w-full bg-white border border-gray-200 focus:border-indigo-500 text-gray-800 text-xs font-medium p-2.5 rounded-xl focus:outline-none transition-colors"
+                          />
+                        </div>
                       </div>
 
                     </div>
