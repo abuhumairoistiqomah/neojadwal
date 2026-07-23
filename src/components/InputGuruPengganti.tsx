@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, isSameDay, isITBACoreSubject, isAlQuranOrTahsin } from "../types";
+import { Teacher, ScheduleItem, LogIzinItem, checkIsITBA, checkIsNative, isSameDay, isITBACoreSubject, isAlQuranOrTahsin } from "../types";
 import { 
   ArrowLeft, Calendar, UserCheck, HelpCircle, Save, 
   Trash2, Plus, Sparkles, CheckSquare, AlertTriangle, AlertCircle 
@@ -53,7 +53,6 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
   }, [teachers, searchTeacherQuery]);
 
   const [alasan, setAlasan] = useState<string>("");
-  const [tugasInput, setTugasInput] = useState<string>("");
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
   const [generatedRows, setGeneratedRows] = useState<Array<{
     jam_ke: number;
@@ -140,7 +139,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         kelas: displayKelas,
         mapel: displayMapel,
         selectedPengganti: "",
-        tugas: tugasInput || "",
+        tugas: "",
       };
     });
 
@@ -170,6 +169,9 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
 
     const candidates = teachers.filter(t => {
       const isAbsent = t.nama === guruIzin;
+      if (isJp0Slot) {
+        return !isAbsent; // Keep Native teachers for JP-0 so they are evaluated as Ranking 4
+      }
       const isNative = nativeTeachersToExclude.some(
         nativeName => t.nama.trim().toLowerCase().includes(nativeName)
       );
@@ -361,51 +363,72 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         };
       }
 
-      // Special Recommendation Logic for JP-0 (Homeroom Session)
+      const isNative = checkIsNative(candidate) || nativeTeachersToExclude.some(
+        nativeName => candidate.nama.trim().toLowerCase().includes(nativeName)
+      );
+      const isManajemen = Boolean(candidate.is_manajemen) || (candidate.tugas_tambahan || "").toLowerCase().includes("manajemen") || (candidate.keterangan || "").toLowerCase().includes("manajemen");
+      const isWaliKelas = Boolean(candidate.wali_kelas) || (candidate.tugas_tambahan || "").toLowerCase().includes("wali kelas");
+      const isPendampingKelas = Boolean(candidate.pendamping_kelas) || (candidate.tugas_tambahan || "").toLowerCase().includes("pendamping") || (candidate.keterangan || "").toLowerCase().includes("pendamping");
+
+      // Special Strict Recommendation Logic for JP-0 (Homeroom Session)
       if (isJp0Slot) {
-        if (!candidate.is_manajemen && !candidate.wali_kelas) {
+        if (!isManajemen && !isWaliKelas && !isPendampingKelas && !isNative) {
+          // Ranking 1: Guru Non-Manajemen DAN Bukan Wali Kelas DAN Bukan Pendamping Kelas
+          score += 300;
+          reasons.push("Ranking 1 JP-0: Non-Manajemen, Bukan Wali Kelas, Bukan Pendamping (+300)");
+        } else if (isPendampingKelas || isPendampingOnDay) {
+          // Ranking 2: Guru Pendamping Kelas (atau Pendamping Wali Kelas)
           score += 200;
-          reasons.push("Guru Non-Manajemen & Bukan Wali Kelas (Prioritas Utama JP-0) (+200)");
-        } else if (candidate.pendamping_kelas || isPendampingOnDay) {
+          reasons.push("Ranking 2 JP-0: Guru Pendamping Kelas (+200)");
+        } else if (isManajemen) {
+          // Ranking 3: Tim Manajemen
           score += 100;
-          reasons.push("Guru Pendamping Wali Kelas (Prioritas Kedua JP-0) (+100)");
+          reasons.push("Ranking 3 JP-0: Tim Manajemen (+100)");
+        } else if (isNative) {
+          // Ranking 4: Guru Native
+          score += 50;
+          reasons.push("Ranking 4 JP-0: Guru Native (+50)");
+        } else {
+          score += 120;
+          reasons.push("Wali Kelas (+120)");
         }
-      }
+      } else {
+        // Regular Subject matching rules
+        // Prioritas 1: Semapel
+        const isSameMapel = candidate.mapel_utama.toLowerCase() === subjectLabel.toLowerCase() || 
+                            candidate.mapel_utama.toLowerCase().includes(subjectLabel.toLowerCase()) ||
+                            subjectLabel.toLowerCase().includes(candidate.mapel_utama.toLowerCase());
+        if (isSameMapel) {
+          score += 100;
+          reasons.push("Mata Pelajaran Sama (+100)");
+        }
 
-      // Prioritas 1: Semapel
-      const isSameMapel = candidate.mapel_utama.toLowerCase() === subjectLabel.toLowerCase() || 
-                          candidate.mapel_utama.toLowerCase().includes(subjectLabel.toLowerCase()) ||
-                          subjectLabel.toLowerCase().includes(candidate.mapel_utama.toLowerCase());
-      if (isSameMapel) {
-        score += 100;
-        reasons.push("Mata Pelajaran Sama (+100)");
-      }
+        // Prioritas 2: Serumpun
+        const targetRumpunList = targetTeacher.rumpun.split(",").map(r => r.trim().toLowerCase());
+        const candidateRumpunList = candidate.rumpun.split(",").map(r => r.trim().toLowerCase());
+        const hasSharedRumpun = candidateRumpunList.some(r => targetRumpunList.includes(r));
+        if (hasSharedRumpun) {
+          score += 50;
+          reasons.push("Rumpun Bidang Sama (+50)");
+        }
 
-      // Prioritas 2: Serumpun
-      const targetRumpunList = targetTeacher.rumpun.split(",").map(r => r.trim().toLowerCase());
-      const candidateRumpunList = candidate.rumpun.split(",").map(r => r.trim().toLowerCase());
-      const hasSharedRumpun = candidateRumpunList.some(r => targetRumpunList.includes(r));
-      if (hasSharedRumpun) {
-        score += 50;
-        reasons.push("Rumpun Bidang Sama (+50)");
-      }
+        // Prioritas 3: Sejenjang
+        if (candidate.jenjang === targetTeacher.jenjang) {
+          score += 20;
+          reasons.push("Jenjang Sama (+20)");
+        }
 
-      // Prioritas 3: Sejenjang
-      if (candidate.jenjang === targetTeacher.jenjang) {
-        score += 20;
-        reasons.push("Jenjang Sama (+20)");
-      }
+        // Prioritas 4: Wali Kelas (Turunkan prioritasnya)
+        if (candidate.wali_kelas) {
+          score -= 15;
+          reasons.push("Wali Kelas (-15)");
+        }
 
-      // Prioritas 4: Wali Kelas (Turunkan prioritasnya jika bukan khusus JP-0)
-      if (candidate.wali_kelas && !isJp0Slot) {
-        score -= 15;
-        reasons.push("Wali Kelas (-15)");
-      }
-
-      // Prioritas 5: Manajemen (Turunkan ke prioritas paling bawah)
-      if (candidate.is_manajemen) {
-        score -= 100;
-        reasons.push("Tim Manajemen (-100)");
+        // Prioritas 5: Manajemen (Turunkan ke prioritas paling bawah)
+        if (candidate.is_manajemen) {
+          score -= 100;
+          reasons.push("Tim Manajemen (-100)");
+        }
       }
 
       // Catatan Tambahan untuk ITBA
@@ -436,10 +459,11 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
         reasons.push("Mahasiswa ITBA bukan pendamping hari ini (-50)");
       }
 
-      // Penalty for Teachers Currently On Leave (Filter Sedang Izin)
+      // Penalty for Teachers Currently On Leave (Filter Sedang Izin - Bottom Priority)
       if (isAbsentToday) {
-        score -= 5000;
-        reasons.push("Sedang Izin Hari Ini (-5000)");
+        score = -9999;
+        reasons.length = 0;
+        reasons.push("Sedang Izin Hari Ini (-9999)");
       }
 
       const isPendamping = schedules.some(s => {
@@ -531,7 +555,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
       kelas: row.kelas,
       mapel: row.mapel,
       guru_pengganti: row.selectedPengganti,
-      tugas: row.tugas || tugasInput || "",
+      tugas: row.tugas || "",
     }));
 
     onAddLogs(newLogs);
@@ -542,7 +566,6 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
     setSearchTeacherQuery("");
     setShowTeacherSuggestions(false);
     setAlasan("");
-    setTugasInput("");
     setSelectedHours([]);
     setGeneratedRows([]);
     
@@ -738,22 +761,6 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                 onChange={(e) => setAlasan(e.target.value)}
                 className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white text-gray-800 border border-gray-200 focus:border-indigo-500 rounded-xl p-3 focus:outline-none transition-all text-sm font-medium"
                 required
-              />
-            </div>
-
-            {/* Field C2: Catatan Tugas / Link Materi */}
-            <div className="space-y-2 md:col-span-2">
-              <label className="block text-sm font-bold text-gray-700 flex items-center justify-between">
-                <span>Catatan Tugas / Link Materi (Opsional)</span>
-                <span className="text-xs font-normal text-gray-400">Tersedia hyperlink otomatis (http://, https://, www.)</span>
-              </label>
-              <input
-                id="input-tugas-materi"
-                type="text"
-                placeholder="Contoh: Kerjakan LKS Hal 25 atau buka Google Classroom https://classroom.google.com/c/xxx"
-                value={tugasInput}
-                onChange={(e) => setTugasInput(e.target.value)}
-                className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white text-gray-800 border border-gray-200 focus:border-indigo-500 rounded-xl p-3 focus:outline-none transition-all text-sm font-medium"
               />
             </div>
 
@@ -1023,6 +1030,7 @@ export const InputGuruPengganti: React.FC<InputGuruPenggantiProps> = ({
                               <option 
                                 key={candidate.teacher.nama} 
                                 value={candidate.teacher.nama}
+                                disabled
                               >
                                 {candidate.teacher.nama} (Sedang Izin) [Mapel: {candidate.teacher.mapel_utama}] (Beban: {candidate.mengajarJp} + {candidate.pendampingJp} JP)
                               </option>

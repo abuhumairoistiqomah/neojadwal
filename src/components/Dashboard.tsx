@@ -55,6 +55,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [selectedClass, setSelectedClass] = useState<string>(() => {
     return localStorage.getItem("dashboard_selected_class") || "";
   });
+  const [taskModalData, setTaskModalData] = useState<{
+    isOpen: boolean;
+    kelas: string;
+    mapel: string;
+    guru_izin: string;
+    tugas: string;
+  } | null>(null);
+
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Compute all unique classes from schedules
@@ -842,11 +850,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                   {item.alasan && <span className="text-xs text-amber-700 font-medium">({item.alasan})</span>}
                                 </p>
                                 {item.tugas && (
-                                  <div className="text-xs text-blue-900 bg-blue-50/90 border border-blue-200 px-3 py-1.5 rounded-lg w-fit shadow-2xs space-y-0.5">
-                                    <span className="font-bold text-blue-700 block text-[10px] uppercase tracking-wider">📌 Tugas / Link Materi:</span>
-                                    <div className="font-medium break-words">
-                                      {renderTaskWithLinks(item.tugas)}
-                                    </div>
+                                  <div className="mt-2">
+                                    <button
+                                      onClick={() => setTaskModalData({
+                                        isOpen: true,
+                                        kelas: item.kelas,
+                                        mapel: item.mapel,
+                                        guru_izin: item.guru_izin,
+                                        tugas: item.tugas
+                                      })}
+                                      className="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm border border-blue-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                      <span>📋 Lihat Kegiatan Siswa / Tugas</span>
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -1394,6 +1410,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         </div>
       </div>
+
+      {/* MODAL TUGAS INVAL */}
+      {taskModalData?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-lg">📝 Detail Kegiatan / Tugas</h3>
+                <p className="text-xs font-medium text-slate-500 mt-0.5">
+                  Kelas {taskModalData.kelas} • {taskModalData.mapel}
+                </p>
+              </div>
+              <button 
+                onClick={() => setTaskModalData(null)}
+                className="p-1.5 bg-slate-200 hover:bg-red-100 text-slate-600 hover:text-red-600 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5"/>
+              </button>
+            </div>
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pesan dari {taskModalData.guru_izin}:</p>
+              <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl text-sm text-slate-700 leading-relaxed">
+                {renderTaskWithLinks(taskModalData.tugas)}
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button 
+                onClick={() => setTaskModalData(null)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-xl transition-colors shadow-sm cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

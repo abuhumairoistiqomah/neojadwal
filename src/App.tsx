@@ -389,6 +389,7 @@ export default function App() {
             kelas: String(log.kelas || "").trim(),
             mapel: String(log.mapel || "").trim(),
             guru_pengganti: String(log.guru_pengganti || "").trim(),
+            tugas: String(log.tugas || log.task || log.link || log["keterangan tugas"] || log["keterangan_tugas"] || "").trim(),
             created_at: log.created_at || new Date().toISOString()
           };
         });
