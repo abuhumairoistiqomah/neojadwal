@@ -63,7 +63,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       day: "numeric"
     });
 
-    let waText = `*Hal: Guru Pengganti*\n\nBismillah. Berikut nama - nama guru pengganti hari *${dateFormatted}*.\n\n`;
+    let waText = `*Hal: Guru Pengganti*\n\nBismillah. Berikut nama - nama guru pengganti hari *${dateFormatted}*.\nInfo lebih lanjut, buka di situs jadwal digital: https://neojadwalv1.vercel.app/\n\n`;
     
     // Group items by Teacher Izin first so they appear neatly
     const teacherMap: Record<string, LogIzinItem[]> = {};
@@ -81,8 +81,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       let section = `*${guruIzin}* - ${alasan}\n`;
       
       logsList.forEach((log, index) => {
-        const tugasText = log.tugas ? ` _(Tugas: ${log.tugas})_` : "";
-        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* - *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*${tugasText}\n`;
+        section += `${index + 1}. *JP ${log.jam_ke}* (*${log.kelas}* - *${log.mapel}*) digantikan oleh *${log.guru_pengganti}*\n`;
       });
       
       teacherSections.push(section.trimEnd());
