@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { LogIzinItem, renderTaskWithLinks } from "../types";
 import { 
   ArrowLeft, ClipboardList, Copy, Check, Search, Calendar, 
-  Trash2, ShieldAlert, CheckCircle, HelpCircle, FileText 
+  Trash2, ShieldAlert, CheckCircle, HelpCircle, Bell 
 } from "lucide-react";
 import { JAM_TIME_MAP } from "./Dashboard";
 
@@ -12,6 +12,22 @@ interface LogGuruPenggantiProps {
   onBack: () => void;
 }
 
+// Safely format date YYYY-MM-DD into Indonesian string
+const formatIndoDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-").map(Number);
+  if (parts.length !== 3) return dateStr;
+  const [year, month, day] = parts;
+  const d = new Date(year, month - 1, day);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+};
+
 export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
   logs,
   onDeleteLog,
@@ -19,6 +35,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedDate, setCopiedDate] = useState<string | null>(null);
+  const [copiedIndividualId, setCopiedIndividualId] = useState<string | null>(null);
 
   // Group logs by Date
   const groupedLogs = useMemo(() => {
@@ -53,15 +70,10 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       .sort((a, b) => b.tanggal.localeCompare(a.tanggal));
   }, [logs, searchQuery]);
 
-  // Generate WhatsApp text format for a specific date and copy to clipboard
+  // Generate WhatsApp text format for a specific date and copy to clipboard (Broadcast)
   const handleCopyWA = (tanggal: string, items: LogIzinItem[]) => {
     // Format date beautifully Indonesian style
-    const dateFormatted = new Date(tanggal).toLocaleDateString("id-ID", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    });
+    const dateFormatted = formatIndoDate(tanggal);
 
     let waText = `*Hal: Guru Pengganti*\n\nBismillah. Berikut nama - nama guru pengganti hari *${dateFormatted}*.\nInfo lebih lanjut, buka di situs jadwal digital: https://neojadwalv1.vercel.app/\n\n`;
     
@@ -95,6 +107,38 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
       setTimeout(() => {
         setCopiedDate(null);
       }, 2500);
+    });
+  };
+
+  // Generate individual WhatsApp reminder template for a specific teacher record
+  const handleCopyIndividualReminder = (log: LogIzinItem) => {
+    const dateFormatted = formatIndoDate(log.tanggal);
+    const namePengganti = log.guru_pengganti.trim();
+    const nameIzin = log.guru_izin.trim();
+    const mapel = log.mapel.trim();
+    const kelas = log.kelas.trim();
+    const jamKe = log.jam_ke;
+
+    let msg = `Assalamu'alaikum, Ustadz/Ustadzah ${namePengganti}.\n\n` +
+      `Izin mengingatkan jadwal badal yang tercatat untuk ${dateFormatted} ya 😊\n\n` +
+      `📚 Mata Pelajaran: ${mapel}\n` +
+      `🏫 Kelas: ${kelas}\n` +
+      `🕒 JP: ${jamKe}\n` +
+      `👤 Menggantikan: ${nameIzin}`;
+
+    if (log.tugas && log.tugas.trim() !== "") {
+      msg += `\n\n📝 Kegiatan/Tugas Siswa:\n${log.tugas.trim()}`;
+    }
+
+    msg += `\n\nJazakumullahu khairan atas kesediaannya membantu. Semoga Allah mudahkan aktivitas hari ini. 🙏`;
+
+    navigator.clipboard.writeText(msg).then(() => {
+      setCopiedIndividualId(log.id);
+      setTimeout(() => {
+        setCopiedIndividualId(null);
+      }, 2000);
+    }).catch((err) => {
+      console.error("Gagal menyalin ke clipboard:", err);
     });
   };
 
@@ -150,10 +194,11 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
         {/* Info Banner */}
         <div className="text-xs font-semibold text-indigo-800 bg-indigo-50/75 border border-indigo-100/50 p-4 rounded-xl flex items-start gap-2.5 mb-6">
           <HelpCircle className="w-4.5 h-4.5 text-indigo-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold">Fitur Broadcast Siaran WhatsApp:</p>
-            <p className="text-indigo-700/90 font-medium mt-0.5">
-              Klik tombol <strong>"Salin Format WA"</strong> di setiap kelompok tanggal. Sistem akan menyusun draf laporan yang rapi dan menyalinnya ke clipboard Anda secara otomatis, siap dikirim ke grup sekolah.
+          <div className="space-y-1">
+            <p className="font-bold">Fitur WhatsApp Guru Pengganti:</p>
+            <p className="text-indigo-700/90 font-medium">
+              • <strong>Broadcast Siaran:</strong> Klik <strong>"Salin Format WA"</strong> untuk menyalin draf laporan rekap harian.<br />
+              • <strong>Pengingat Individu:</strong> Klik <strong>"🔔 Ingatkan Individu"</strong> pada tiap baris record untuk menyalin pesan pengingat sopan yang ditujukan langsung ke guru pengganti terkait.
             </p>
           </div>
         </div>
@@ -169,19 +214,14 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4.5 h-4.5 text-indigo-500" />
                     <span className="font-bold text-gray-800 text-sm sm:text-base">
-                      {new Date(group.tanggal).toLocaleDateString("id-ID", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric"
-                      })}
+                      {formatIndoDate(group.tanggal)}
                     </span>
                     <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-md">
                       {group.items.length} Inval
                     </span>
                   </div>
 
-                  {/* Copy Button */}
+                  {/* Copy Broadcast Button */}
                   <button
                     id={`copy-wa-${group.tanggal}`}
                     onClick={() => handleCopyWA(group.tanggal, group.items)}
@@ -217,7 +257,7 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                         <th className="p-3">Kelas</th>
                         <th className="p-3">Tugas / Link</th>
                         <th className="p-3">Guru Pengganti (Inval)</th>
-                        {onDeleteLog && <th className="p-3 w-16 text-center">Aksi</th>}
+                        <th className="p-3 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
@@ -246,18 +286,44 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                               {log.guru_pengganti}
                             </span>
                           </td>
-                          {onDeleteLog && (
-                            <td className="p-3 text-center">
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Individual WA Reminder Button */}
                               <button
-                                id={`delete-log-${log.id}`}
-                                onClick={() => onDeleteLog(log.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Hapus log"
+                                id={`remind-indiv-${log.id}`}
+                                onClick={() => handleCopyIndividualReminder(log)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 border whitespace-nowrap ${
+                                  copiedIndividualId === log.id
+                                    ? "bg-emerald-600 text-white border-emerald-700"
+                                    : "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200/80 hover:border-amber-300"
+                                }`}
+                                title="Salin pesan pengingat WA individual"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                {copiedIndividualId === log.id ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Pengingat Disalin</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Bell className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>Ingatkan Individu</span>
+                                  </>
+                                )}
                               </button>
-                            </td>
-                          )}
+
+                              {onDeleteLog && (
+                                <button
+                                  id={`delete-log-${log.id}`}
+                                  onClick={() => onDeleteLog(log.id)}
+                                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Hapus log"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -307,6 +373,31 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
                           <span className="font-bold text-emerald-800">{log.guru_pengganti}</span>
                         </div>
                       </div>
+
+                      {/* Mobile Individual Reminder Button */}
+                      <div className="pt-2 border-t border-gray-100 flex justify-end">
+                        <button
+                          id={`remind-indiv-mob-${log.id}`}
+                          onClick={() => handleCopyIndividualReminder(log)}
+                          className={`w-full py-2 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 border ${
+                            copiedIndividualId === log.id
+                              ? "bg-emerald-600 text-white border-emerald-700"
+                              : "bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200"
+                          }`}
+                        >
+                          {copiedIndividualId === log.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Pengingat Disalin ke Clipboard</span>
+                            </>
+                          ) : (
+                            <>
+                              <Bell className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Ingatkan Individu</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -326,3 +417,4 @@ export const LogGuruPengganti: React.FC<LogGuruPenggantiProps> = ({
     </div>
   );
 };
+
